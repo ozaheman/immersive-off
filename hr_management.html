@@ -1,0 +1,1325 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban Axis - HR & Office Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background-color: #f4f7fa;
+        }
+
+        ul {
+            list-style-type: disc;
+            /* Explicit bullet style */
+            list-style-position: outside;
+            /* Keep bullets outside text */
+            margin-left: 20px;
+            /* Indent for clarity */
+        }
+
+        ul li::before {
+            content: "• ";
+            /* Force bullet as text */
+            font-family: Arial, sans-serif;
+            /* Ensure supported glyph */
+        }
+
+        .hr-container {
+            max-width: 1600px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        .tool-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .tool-card h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            color: #555;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .hr-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .form-card {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .ul {
+            list-style-type: disc;
+            /* or circle, square */
+            font-family: Arial, sans-serif;
+            /* safe font */
+        }
+
+
+        .letter-preview {
+            border: 1px solid #ddd;
+            padding: 20mm;
+            min-height: 297mm;
+            background: #fff;
+            line-height: 1.6;
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+        }
+
+        #dynamic-letter-fields .input-group {
+            margin-top: 15px;
+        }
+
+        .staff-photo-preview {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: block;
+            border: 3px solid #eee;
+        }
+
+        .basic-salary-display {
+            font-size: 0.8em;
+            color: #666;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .reminder-list ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .reminder-list li {
+            background: #fff8e1;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 8px;
+        }
+
+        .reminder-list li.danger {
+            background: #fbe9e7;
+            border-left-color: #dc3545;
+        }
+
+        .table-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .import-group label {
+            margin-right: 5px;
+            font-size: 0.9em;
+        }
+
+        /* MODIFICATION START: Styles for Search Bar */
+        .table-search-input {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9em;
+            min-width: 200px;
+            margin-right: auto;
+            /* Pushes other controls to the right */
+        }
+
+        /* MODIFICATION END */
+    </style>
+</head>
+
+<body>
+
+    <div class="hr-container" id="app-container">
+        <header class="app-header">
+            <h1>HR & Office Management</h1>
+            <div class="dashboard-header-controls">
+                <button id="logout-btn" class="secondary-button" style="display: none;">Logout</button>
+                <form action="revenue.html"><input type="submit" value="Business Intelligence" /></form>
+                <form action="index.html"><input type="submit" value="← Back to Main Dashboard" /></form>
+
+                <!-- <a href="revenue.html" class="secondary-button">Business Intelligence</a> -->
+                <!-- <a href="index.html" class="secondary-button">← Back to Main Dashboard</a> -->
+            </div>
+        </header>
+
+        <div class="tabs" id="tabs">
+            <button class="tab-button" data-tab="staff-list">Staff List & Salaries</button>
+            <button class="tab-button" data-tab="reminders">Reminders</button>
+            <button class="tab-button" data-tab="offer-letters">Offer Letters</button>
+            <button class="tab-button" data-tab="leave-management">Annual Leaves</button>
+            <button class="tab-button" data-tab="expense-log">Office Expense Log</button>
+            <button class="tab-button" data-tab="payroll">Payroll Tools</button>
+            <button class="tab-button" data-tab="letter-management">Letter Management</button>
+            <!-- Removed duplicate letter-generation tab button -->
+            <!-- MODIFICATION: Add Efficiency Report tab -->
+            <button class="tab-button" data-tab="vat-report">VAT Report</button>
+            <!-- MODIFICATION END -->
+            <button class="tab-button" data-tab="annual-expenses">Annual Expenses</button>
+            <button class="tab-button" data-tab="increments">Staff Increments</button>
+
+            <button class="tab-button" data-tab="efficiency">Efficiency Report</button>
+            <!-- MODIFICATION START: New Tabs -->
+            <button class="tab-button" data-tab="referral-accounts">Referral Accounts</button>
+            <button class="tab-button" data-tab="other-accounts">Other Accounts</button>
+            <!-- MODIFICATION START: New Tabs -->
+            <button class="tab-button" data-tab="asset-tracker">Asset Tracker</button>
+            <button class="tab-button" data-tab="tools">Tools</button>
+            <button class="tab-button active" data-tab="invoices">Invoices</button>
+            <!-- MODIFICATION END -->
+        </div>
+
+        <!-- Tab 1: Staff List -->
+        <div id="staff-list-tab" class="tab-content">
+            <div class="tool-card" id="staff-list-card">
+                <h3>
+                    <span>Staff & Salary Overview</span>
+                    <button id="add-staff-btn" class="primary-button">+ Add Staff Member</button>
+                </h3><!-- MODIFICATION START: Table Controls -->
+                <div class="table-controls">
+                    <!-- MODIFICATION START: Search Bar -->
+                    <input type="search" class="table-search-input" data-table-selector="#staff-table"
+                        placeholder="Search staff...">
+                    <!-- MODIFICATION END -->
+                    <button class="secondary-button export-csv-btn" data-table-id="staff-table"
+                        data-filename="Staff_List">Export as CSV</button>
+                    <button class="secondary-button print-pdf-btn" data-element-id="staff-list-card"
+                        data-filename="Staff_List">Print as PDF</button>
+                </div>
+                <!-- MODIFICATION END -->
+                <div class="table-container">
+                    <table class="output-table" id="staff-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Join Date</th>
+                                <th style="text-align:right;">Gross Salary</th>
+                                <th style="text-align:right;">Est. Gratuity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staff-list-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Tab for Payroll Tools -->
+        <div id="payroll-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1.2fr 2fr;">
+                <div>
+                    <!-- Payroll Generation Form -->
+                    <div class="form-card" style="margin-bottom: 20px;">
+                        <h3>Generate Payslip</h3>
+                        <div class="input-group">
+                            <label for="payroll-staff-select">Select Staff</label>
+                            <select id="payroll-staff-select"></select>
+                        </div>
+                        <div class="input-group-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="input-group">
+                                <label for="payroll-month-select">Month</label>
+                                <select id="payroll-month-select"></select>
+                            </div>
+                            <div class="input-group">
+                                <label for="payroll-year-select">Year</label>
+                                <select id="payroll-year-select"></select>
+                            </div>
+                        </div>
+                        <button id="generate-payslip-btn" class="primary-button" style="width: 100%;">Generate
+                            Payslip</button>
+                    </div>
+
+                    <!-- Monthly Payroll Summary -->
+                    <div class="tool-card" id="payroll-summary-card">
+                        <h3>Monthly Payroll Summary</h3>
+                        <p>Total payroll cost for the selected month (<span id="summary-month-display"></span>).</p>
+                        <table class="output-table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th style="text-align:right;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payroll-summary-body">
+                                <!-- Summary data will be populated here -->
+                            </tbody>
+                        </table>
+                        <div style="margin-top: 15px; text-align: right;">
+                            <button id="download-wps-sif-btn" class="secondary-button"
+                                title="Generate WPS SIF file for bank upload">Generate WPS SIF file</button>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="tool-card">
+                    <h3>
+                        <span>Payslip Preview</span>
+                        <button id="download-payslip-pdf-btn" class="secondary-button" style="display:none;">Download as
+                            PDF</button>
+                    </h3>
+                    <div id="payslip-preview" class="letter-preview">
+                        <p style="text-align: center; color: #888;">Select an employee and period to generate a payslip.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Tab: Letter Management -->
+        <div id="letter-management-tab" class="tab-content">
+            <div class="tool-card">
+                <div class="sub-tabs-container">
+                    <div class="tabs sub-tabs" id="letter-sub-tabs">
+                        <button class="tab-button active" data-sub-tab="compose-letter">Compose Letter</button>
+                        <button class="tab-button" data-sub-tab="draft-letters">Drafts (<span
+                                id="draft-count">0</span>)</button>
+                        <button class="tab-button" data-sub-tab="sent-letters">Sent (<span
+                                id="sent-count">0</span>)</button>
+                        <button class="tab-button" data-sub-tab="letter-templates">Templates</button>
+                    </div>
+                </div>
+
+                <div id="compose-letter-sub-tab" class="sub-tab-content active">
+                    <div class="hr-layout" style="grid-template-columns: 2fr 1fr;">
+                        <div class="compose-area">
+                            <section class="form-section">
+                                <h4>Letter Details</h4>
+                                <p class="section-desc">Fill in the letter information and content</p>
+                                <div class="input-group-grid" style="grid-template-columns: 1fr 1fr;">
+                                    <div class="input-group">
+                                        <label for="letter-type-select">Letter Type</label>
+                                        <select id="letter-type-select">
+                                            <option value="">Official Communication</option>
+                                            <option value="appreciation">Appreciation Letter</option>
+                                            <option value="warning">Warning Letter</option>
+                                            <option value="termination">Termination Letter</option>
+                                            <option value="salary_certificate">Salary Certificate</option>
+                                            <option value="experience_certificate">Experience Certificate</option>
+                                            <option value="internship_offer">Internship Offer Letter</option>
+                                            <option value="noc_request">NOC Request Letter</option>
+                                            <option value="notice">General Notice</option>
+                                            <option value="authority">Authority Letter</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="letter-template-select">Template</label>
+                                        <select id="letter-template-select">
+                                            <option value="standard">Standard Business Letter</option>
+                                            <option value="formal">Formal Communication</option>
+                                            <option value="project">Project-Related</option>
+                                            <option value="technical">Technical Documentation</option>
+                                            <option value="commercial">Commercial Letter</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button id="load-template-btn" class="secondary-button"
+                                    style="width: 100%; margin-top: 10px;">
+                                    📋 Load Template Content
+                                </button>
+                            </section>
+
+                            <section class="form-section" style="margin-top: 20px;">
+                                <h4>Recipient Information</h4>
+                                <div class="input-group-grid" style="grid-template-columns: 1.5fr 1fr;">
+                                    <div class="input-group">
+                                        <label for="letter-recipient-name">Name</label>
+                                        <input type="text" id="letter-recipient-name" placeholder="Recipient's name"
+                                            list="recipient-history-list">
+                                        <datalist id="recipient-history-list"></datalist>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="letter-recipient-designation">Designation</label>
+                                        <input type="text" id="letter-recipient-designation" placeholder="Designation">
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label for="letter-recipient-company">Company</label>
+                                    <input type="text" id="letter-recipient-company" placeholder="Company name">
+                                </div>
+                                <div class="input-group">
+                                    <label for="letter-recipient-address">Address</label>
+                                    <textarea id="letter-recipient-address" rows="3"
+                                        placeholder="Complete address"></textarea>
+                                </div>
+                            </section>
+
+                            <section class="form-section" style="margin-top: 20px;">
+                                <div class="input-group">
+                                    <label for="letter-subject-input">Subject</label>
+                                    <input type="text" id="letter-subject-input" placeholder="Letter subject">
+                                </div>
+                                <div class="input-group">
+                                    <div class="rich-text-editor-container">
+                                        <div class="editor-toolbar">
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('bold', false, null)"
+                                                title="Bold"><b>B</b></button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('italic', false, null)"
+                                                title="Italic"><i>I</i></button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('underline', false, null)"
+                                                title="Underline"><u>U</u></button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('strikeThrough', false, null)"
+                                                title="Strike">S</button>
+                                            <span class="toolbar-sep">|</span>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('insertUnorderedList', false, null)"
+                                                title="Bullets">•</button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('insertOrderedList', false, null)"
+                                                title="Numbered">1.</button>
+                                            <span class="toolbar-sep">|</span>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('justifyLeft', false, null)"
+                                                title="Left">L</button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('justifyCenter', false, null)"
+                                                title="Center">C</button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('justifyRight', false, null)"
+                                                title="Right">R</button>
+                                            <span class="toolbar-sep">|</span>
+                                            <select class="toolbar-select"
+                                                onchange="document.execCommand('fontSize', false, this.value); this.selectedIndex=0;">
+                                                <option value="">Size</option>
+                                                <option value="1">Small</option>
+                                                <option value="3">Normal</option>
+                                                <option value="5">Large</option>
+                                                <option value="7">Huge</option>
+                                            </select>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="const url=prompt('Enter URL:'); if(url) document.execCommand('createLink', false, url)"
+                                                title="Link">🔗</button>
+                                            <button type="button" class="toolbar-btn"
+                                                onclick="document.execCommand('removeFormat', false, null)"
+                                                title="Clear">🧹</button>
+                                        </div>
+                                        <div id="letter-content-body" contenteditable="true"
+                                            class="letter-content-editor"
+                                            data-placeholder="Type your letter content here..."></div>
+                                    </div>
+                                    <style>
+                                        .rich-text-editor-container {
+                                            border: 1px solid #ced4da;
+                                            border-radius: 4px;
+                                            overflow: hidden;
+                                            background: white;
+                                        }
+
+                                        .editor-toolbar {
+                                            background: #f1f3f5;
+                                            border-bottom: 1px solid #ced4da;
+                                            padding: 5px;
+                                            display: flex;
+                                            gap: 3px;
+                                            align-items: center;
+                                            flex-wrap: wrap;
+                                        }
+
+                                        .toolbar-sep {
+                                            color: #ced4da;
+                                            margin: 0 5px;
+                                        }
+
+                                        .toolbar-select {
+                                            border: 1px solid #dee2e6;
+                                            border-radius: 3px;
+                                            font-size: 0.8em;
+                                            padding: 2px;
+                                        }
+
+                                        .toolbar-btn {
+                                            border: 1px solid #dee2e6;
+                                            background: white;
+                                            padding: 2px 8px;
+                                            cursor: pointer;
+                                            border-radius: 3px;
+                                            font-size: 0.9em;
+                                        }
+
+                                        .toolbar-btn:hover {
+                                            background: #e9ecef;
+                                        }
+
+                                        .letter-content-editor {
+                                            min-height: 300px;
+                                            padding: 15px;
+                                            outline: none;
+                                            line-height: 1.6;
+                                        }
+
+                                        .letter-content-editor:empty:before {
+                                            content: attr(data-placeholder);
+                                            color: #adb5bd;
+                                        }
+                                    </style>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="sidebar-area">
+                            <section class="action-section tool-card" style="padding: 15px;">
+                                <h4>Actions</h4>
+                                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                                    <button id="save-letter-draft-btn" class="secondary-button">💾 Save Draft</button>
+                                    <button id="preview-letter-btn" class="secondary-button">👁️ Preview</button>
+                                    <button id="download-letter-pdf-v2-btn" class="secondary-button">📄 Download
+                                        PDF</button>
+
+                                    <div class="send-split-btn">
+                                        <button id="mark-as-sent-btn" class="primary-button" style="width: 100%;">🚀
+                                            Mark as Sent</button>
+                                        <div class="split-options" style="display: flex; gap: 5px; margin-top: 5px;">
+                                            <button id="send-whatsapp-btn" class="success-button"
+                                                style="flex: 1; padding: 8px;" title="Send via WhatsApp">WA</button>
+                                            <button id="send-email-btn" class="info-button"
+                                                style="flex: 1; padding: 8px;" title="Send via Email">Email</button>
+                                            <button id="send-outlook-btn" class="secondary-button"
+                                                style="flex: 1; padding: 8px;" title="Send via Outlook">Outlook</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="info-section tool-card" style="padding: 15px; margin-top: 20px;">
+                                <h4>Letter Information</h4>
+                                <div class="info-grid" style="font-size: 0.9em; margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                        <span>Type:</span> <span id="info-letter-type" class="badge">Draft</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                        <span>Template:</span> <span id="info-letter-template"
+                                            class="badge">Standard</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                        <span>Status:</span> <span id="info-letter-status"
+                                            class="badge danger">draft</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Word Count:</span> <span id="info-word-count">0</span>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="draft-letters-sub-tab" class="sub-tab-content">
+                    <div class="table-container">
+                        <table class="output-table" id="drafts-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Recipient</th>
+                                    <th>Subject</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drafts-list-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="sent-letters-sub-tab" class="sub-tab-content">
+                    <div class="table-container">
+                        <table class="output-table" id="sent-table">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Recipient</th>
+                                    <th>Subject</th>
+                                    <th>Method</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sent-list-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="letter-templates-sub-tab" class="sub-tab-content">
+                    <div class="templates-grid" id="templates-catalog">
+                        <!-- Templates will be listed here with 'Use' button -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Modal for Letter Management -->
+            <div id="letter-preview-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content" style="max-width: 900px;">
+                    <span id="close-letter-preview-btn" class="modal-close-btn">&times;</span>
+                    <h3>Letter Preview</h3>
+                    <div id="letter-management-preview-area" class="letter-preview"></div>
+                    <div style="text-align: right; margin-top: 15px;">
+                        <button id="download-preview-pdf-btn" class="primary-button">Download PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Tab 3: Reminders -->
+        <div id="reminders-tab" class="tab-content">
+            <div class="tool-card">
+                <h3>Upcoming Expirations & Due Dates (Next 60 Days)</h3>
+                <div id="reminder-list" class="reminder-list"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Offer Letters -->
+        <div id="offer-letters-tab" class="tab-content">
+            <div class="hr-layout">
+                <div class="form-card">
+                    <h3>Generate Offer Letter</h3>
+                    <div class="input-group">
+                        <label for="candidate-name">Candidate Name</label>
+                        <input type="text" id="candidate-name" value="John Doe">
+                    </div>
+                    <div class="input-group">
+                        <label for="candidate-role">Role / Position</label>
+                        <input type="text" id="candidate-role" value="Senior Architect">
+                    </div>
+                    <div class="input-group">
+                        <label for="offered-salary">Gross Monthly Salary (AED)</label>
+                        <input type="number" id="offered-salary" value="15000">
+                    </div>
+                    <div class="input-group">
+                        <label for="join-date">Expected Join Date</label>
+                        <input type="date" id="join-date">
+                    </div>
+                    <button id="generate-offer-btn" class="primary-button">Generate Preview</button>
+                </div>
+
+                <div class="tool-card">
+                    <h3>Offer Letter Preview</h3>
+                    <div style="margin-top:10px; text-align:right;">
+                        <button id="download-offer-pdf-btn" class="primary-button" style="display:none;">Download Offer
+                            Letter PDF</button>
+                    </div>
+                    <div id="offer-letter-preview" class="letter-preview">
+                        <p style="text-align: center; color: #888;">Fill the form and click "Generate Preview".</p>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Annual Leaves -->
+        <div id="leave-management-tab" class="tab-content">
+            <div class="hr-layout">
+                <div class="form-card">
+                    <h3>Log New Leave</h3>
+                    <div class="input-group">
+                        <label for="leave-staff-select">Select Staff</label>
+                        <select id="leave-staff-select"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="leave-start-date">Start Date</label>
+                        <input type="date" id="leave-start-date">
+                    </div>
+                    <div class="input-group">
+                        <label for="leave-end-date">End Date</label>
+                        <input type="date" id="leave-end-date">
+                    </div>
+                    <div class="input-group">
+                        <label for="leave-type">Leave Type</label>
+                        <select id="leave-type">
+                            <option>Annual</option>
+                            <option>Sick</option>
+                            <option>Unpaid</option>
+                            <option>Emergency</option>
+                        </select>
+                    </div>
+                    <button id="add-leave-btn" class="primary-button">Add Leave Record</button>
+                </div>
+                <div class="tool-card" id="leave-history-card">
+                    <h3>Leave History</h3>
+                    <!-- MODIFICATION START: Table Controls -->
+                    <div class="table-controls">
+                        <input type="search" class="table-search-input" data-table-selector="#leave-table"
+                            placeholder="Search leave records...">
+                        <button class="secondary-button export-csv-btn" data-table-id="leave-table"
+                            data-filename="Leave_History">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="leave-history-card"
+                            data-filename="Leave_History">Print as PDF</button>
+                    </div>
+                    <!-- MODIFICATION END -->
+                    <div class="table-container">
+                        <table class="output-table" id="leave-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff Name</th>
+                                    <th>Type</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Days</th>
+                                    <th>Remaining Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leave-log-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 6: Office Expense Log -->
+        <div id="expense-log-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1fr 1.5fr;">
+                <div class="form-card">
+                    <h3>Add New Expense</h3>
+                    <div class="input-group">
+                        <label for="expense-date">Date</label>
+                        <input type="date" id="expense-date">
+                    </div>
+                    <div class="input-group">
+                        <label for="expense-category">Category</label>
+                        <select id="expense-category">
+                            <option>Utilities (DEWA)</option>
+                            <option>Office Supplies</option>
+                            <option>Telecommunications</option>
+                            <option>Maintenance</option>
+                            <option>Petty Cash</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="expense-description">Description</label>
+                        <input type="text" id="expense-description" placeholder="e.g., Monthly Office Rent">
+                    </div>
+                    <div class="input-group">
+                        <label for="expense-amount">Amount (AED)</label>
+                        <input type="number" id="expense-amount">
+                    </div>
+                    <button id="add-expense-btn" class="primary-button">Log Expense</button>
+                </div>
+                <div class="tool-card" id="expense-history-card">
+                    <h3>Expense History & Breakdown</h3>
+                    <div class="chart-container" style="height: 250px; margin-bottom: 20px;">
+                        <canvas id="expense-chart"></canvas>
+                    </div>
+                    <div class="filter-buttons tabs" id="expense-filter-container">
+                        <button class="secondary-button active" data-period="1">Last 1 Month</button>
+                        <button class="secondary-button" data-period="3">Last 3 Months</button>
+                        <button class="secondary-button" data-period="6">Last 6 Months</button>
+                    </div>
+                    <!-- MODIFICATION START: Table Controls -->
+                    <div class="table-controls" style="margin-top: 15px;">
+                        <input type="search" class="table-search-input" data-table-selector="#expense-table"
+                            placeholder="Search expenses...">
+                        <button class="secondary-button export-csv-btn" data-table-id="expense-table"
+                            data-filename="Office_Expenses">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="expense-history-card"
+                            data-filename="Office_Expenses">Print as PDF</button>
+                    </div>
+                    <!-- MODIFICATION END -->
+                    <div class="table-container" style="margin-top: 15px;">
+                        <table class="output-table" id="expense-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Category</th>
+                                    <th>Description</th>
+                                    <th style="text-align:right;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expense-log-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 7: Annual Expenses -->
+        <div id="annual-expenses-tab" class="tab-content">
+            <div class="tool-card">
+                <h3>Add Recurring Annual Expense</h3>
+                <div class="input-group-grid"
+                    style="grid-template-columns: 2fr 1fr 1fr auto; align-items:flex-end; gap:15px;">
+                    <div class="input-group"><label>Expense Item (e.g., Trade License)</label><input type="text"
+                            id="annual-expense-item"></div>
+                    <div class="input-group"><label>Amount (AED)</label><input type="number" id="annual-expense-amount">
+                    </div>
+                    <div class="input-group"><label>Next Due Date</label><input type="date"
+                            id="annual-expense-due-date"></div>
+                    <button id="add-annual-expense-btn" class="primary-button">Add Annual Expense</button>
+                </div>
+            </div>
+            <div class="tool-card">
+                <h3>List of Annual Expenses</h3>
+                <div class="table-controls">
+                    <input type="search" class="table-search-input" data-table-selector="#annual-expense-table"
+                        placeholder="Search annual expenses...">
+                </div>
+                <p>These expenses are automatically prorated into monthly costs in the Business Intelligence dashboard.
+                </p>
+                <div class="table-container">
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th style="text-align:right;">Annual Amount</th>
+                                <th>Next Due Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="annual-expense-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 8: Staff Increments -->
+        <div id="increments-tab" class="tab-content">
+            <div class="hr-layout">
+                <div class="form-card">
+                    <h3>Grant Increment</h3>
+                    <div class="input-group">
+                        <label for="increment-staff-select">Select Staff</label>
+                        <select id="increment-staff-select"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="increment-amount">Increment Amount (AED)</label>
+                        <input type="number" id="increment-amount" placeholder="e.g., 500">
+                    </div>
+                    <div class="input-group">
+                        <label for="increment-date">Effective Date</label>
+                        <input type="date" id="increment-date">
+                    </div>
+                    <button id="add-increment-btn" class="primary-button">Record Increment</button>
+                </div>
+                <div class="tool-card" id="increment-history-card">
+                    <h3>Increment History</h3>
+                    <!-- MODIFICATION START: Table Controls -->
+                    <div class="table-controls">
+                        <input type="search" class="table-search-input" data-table-selector="#increment-table"
+                            placeholder="Search increments...">
+                        <button class="secondary-button export-csv-btn" data-table-id="increment-table"
+                            data-filename="Increment_History">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="increment-history-card"
+                            data-filename="Increment_History">Print as PDF</button>
+                    </div>
+                    <!-- MODIFICATION END -->
+                    <div class="table-container">
+                        <table class="output-table" id="increment-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff Name</th>
+                                    <th>Date</th>
+                                    <th style="text-align:right;">Old Salary</th>
+                                    <th style="text-align:right;">Increment</th>
+                                    <th style="text-align:right;">New Salary</th>
+                                </tr>
+                            </thead>
+                            <tbody id="increment-log-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODIFICATION: Add new tab-content div for the report -->
+        <div id="efficiency-tab" class="tab-content">
+            <div class="tool-card" id="efficiency-report-card">
+                <h3>Staff Efficiency Report</h3>
+                <p>This report analyzes completed scrum tasks to compare planned duration vs. actual duration. An
+                    efficiency score greater than 100% means tasks were completed faster than planned.</p>
+                <!-- MODIFICATION START: Table Controls -->
+                <div class="table-controls">
+                    <input type="search" class="table-search-input" data-table-selector="#efficiency-table"
+                        placeholder="Search by staff member...">
+                    <button class="secondary-button export-csv-btn" data-table-id="efficiency-table"
+                        data-filename="Efficiency_Report">Export as CSV</button>
+                    <button class="secondary-button print-pdf-btn" data-element-id="efficiency-report-card"
+                        data-filename="Efficiency_Report">Print as PDF</button>
+                </div>
+                <!-- MODIFICATION END -->
+                <div class="table-container">
+                    <table class="output-table" id="efficiency-table">
+                        <thead>
+                            <tr>
+                                <th>Staff Member</th>
+                                <th>Completed Tasks</th>
+                                <th>Total Planned Days</th>
+                                <th>Total Actual Days</th>
+                                <th>Efficiency Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="efficiency-report-body">
+                            <tr>
+                                <td colspan="5" style="text-align:center;">Loading report...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- MODIFICATION START: New Tabs Content -->
+        <div id="vat-report-tab" class="tab-content">
+            <div class="tool-card" id="vat-report-card">
+                <h3>Monthly VAT Summary (based on Office Expenses)</h3>
+                <p>This report calculates a 5% VAT on all logged office expenses, grouped by month.</p>
+                <div class="table-controls">
+                    <input type="search" class="table-search-input" data-table-selector="#vat-table"
+                        placeholder="Search by month...">
+                    <button class="secondary-button export-csv-btn" data-table-id="vat-table"
+                        data-filename="VAT_Report">Export as CSV</button>
+                    <button class="secondary-button print-pdf-btn" data-element-id="vat-report-card"
+                        data-filename="VAT_Report">Print as PDF</button>
+                </div>
+                <div class="table-container">
+                    <table class="output-table" id="vat-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th style="text-align:right;">Output VAT (Sales)</th>
+                                <th style="text-align:right;">Input VAT (Expenses)</th>
+                                <th style="text-align:right;">Net VAT (Payable/Claimable)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vat-report-body">
+                            <tr>
+                                <td colspan="4" style="text-align:center;">Calculating report...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="referral-accounts-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1fr 2fr;">
+                <div class="form-card">
+                    <h3>Add Referral Account</h3>
+                    <div class="input-group"><label for="ref-name">Name</label><input type="text" id="ref-name"></div>
+                    <div class="input-group"><label for="ref-contact">Contact Person</label><input type="text"
+                            id="ref-contact"></div>
+                    <div class="input-group"><label for="ref-phone">Phone</label><input type="text" id="ref-phone">
+                    </div>
+                    <div class="input-group"><label for="ref-email">Email</label><input type="email" id="ref-email">
+                    </div>
+                    <!-- MODIFICATION START -->
+                    <div class="input-group"><label for="ref-project-no">Associated Project</label><select
+                            id="ref-project-no"></select></div>
+                    <!-- MODIFICATION END -->
+                    <div class="input-group"><label for="ref-notes">Notes</label><textarea id="ref-notes"
+                            rows="3"></textarea></div>
+                    <button id="add-referral-btn" class="primary-button">Add Referral</button>
+                </div>
+                <div class="tool-card" id="referral-accounts-card">
+                    <h3>Referral Accounts List</h3>
+                    <div class="table-controls">
+                        <input type="search" class="table-search-input" data-table-selector="#referral-table"
+                            placeholder="Search referrals...">
+                        <button class="secondary-button export-csv-btn" data-table-id="referral-table"
+                            data-filename="Referral_Accounts">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="referral-accounts-card"
+                            data-filename="Referral_Accounts">Print as PDF</button>
+                        <div class="import-group">
+                            <label for="import-referral-csv">Import CSV:</label>
+                            <input type="file" id="import-referral-csv" class="import-csv-input" data-type="referral"
+                                accept=".csv">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="output-table" id="referral-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Project</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="referral-accounts-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="other-accounts-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1fr 2fr;">
+                <div class="form-card">
+                    <h3>Add Other Account</h3>
+                    <div class="input-group"><label for="other-name">Name</label><input type="text" id="other-name">
+                    </div>
+                    <div class="input-group"><label for="other-contact">Contact Person</label><input type="text"
+                            id="other-contact"></div>
+                    <div class="input-group"><label for="other-phone">Phone</label><input type="text" id="other-phone">
+                    </div>
+                    <div class="input-group"><label for="other-email">Email</label><input type="email" id="other-email">
+                    </div>
+                    <!-- MODIFICATION START -->
+                    <div class="input-group"><label for="other-project-no">Associated Project</label><select
+                            id="other-project-no"></select></div>
+                    <!-- MODIFICATION END -->
+                    <div class="input-group"><label for="other-notes">Notes</label><textarea id="other-notes"
+                            rows="3"></textarea></div>
+                    <button id="add-other-account-btn" class="primary-button">Add Account</button>
+                </div>
+                <div class="tool-card" id="other-accounts-card">
+                    <h3>Other Accounts List</h3>
+                    <div class="table-controls">
+                        <input type="search" class="table-search-input" data-table-selector="#other-accounts-table"
+                            placeholder="Search other accounts...">
+                        <button class="secondary-button export-csv-btn" data-table-id="other-accounts-table"
+                            data-filename="Other_Accounts">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="other-accounts-card"
+                            data-filename="Other_Accounts">Print as PDF</button>
+                        <div class="import-group">
+                            <label for="import-other-csv">Import CSV:</label>
+                            <input type="file" id="import-other-csv" class="import-csv-input" data-type="other"
+                                accept=".csv">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="output-table" id="other-accounts-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Project</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="other-accounts-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- MODIFICATION START: New Asset Tracker and Tools Tabs -->
+        <div id="asset-tracker-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1fr 2.5fr;">
+                <div class="form-card">
+                    <h3>Add New Asset/Inventory</h3>
+                    <div class="input-group"><label for="asset-item-code">Item Code</label><input type="text"
+                            id="asset-item-code"></div>
+                    <div class="input-group"><label for="asset-type">Type</label><input type="text" id="asset-type"
+                            placeholder="e.g., Laptop, Furniture"></div>
+                    <div class="input-group"><label for="asset-location">Location</label><input type="text"
+                            id="asset-location"></div>
+                    <div class="input-group"><label for="asset-department">Department</label><input type="text"
+                            id="asset-department"></div>
+                    <div class="input-group"><label for="asset-project-no">Associated Project</label><select
+                            id="asset-project-no"></select></div>
+                    <div class="input-group-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="input-group"><label for="asset-price">Price (AED)</label><input type="number"
+                                id="asset-price"></div>
+                        <div class="input-group"><label for="asset-date">Purchase Date</label><input type="date"
+                                id="asset-date"></div>
+                    </div>
+                    <div class="input-group"><label for="asset-warranty-expiry">Warranty Expiry</label><input
+                            type="date" id="asset-warranty-expiry"></div>
+                    <div class="input-group"><label for="asset-note1">Note 1</label><textarea id="asset-note1"
+                            rows="2"></textarea></div>
+                    <div class="input-group"><label for="asset-note2">Note 2</label><textarea id="asset-note2"
+                            rows="2"></textarea></div>
+                    <button id="add-asset-btn" class="primary-button">Add Asset</button>
+                </div>
+                <div class="tool-card" id="asset-tracker-card">
+                    <h3>Office Inventory & Asset List</h3>
+                    <div class="table-controls">
+                        <input type="search" class="table-search-input" data-table-selector="#asset-table"
+                            placeholder="Search assets...">
+                        <button class="secondary-button export-csv-btn" data-table-id="asset-table"
+                            data-filename="Asset_List">Export as CSV</button>
+                        <button class="secondary-button print-pdf-btn" data-element-id="asset-tracker-card"
+                            data-filename="Asset_List">Print as PDF</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="output-table" id="asset-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Location</th>
+                                    <th>Department</th>
+                                    <th>Project</th>
+                                    <th>Price</th>
+                                    <th>Purchase Date</th>
+                                    <th>Warranty Expiry</th>
+                                    <th>QR Data</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="asset-list-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tools-tab" class="tab-content">
+            <div class="tool-card">
+                <h3>Data Export Tools</h3>
+                <p>Download all application data in various formats.</p>
+                <div class="input-group-grid"
+                    style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <button id="export-xml-btn" class="primary-button">Download All Data (XML)</button>
+                    <button id="export-zip-btn" class="primary-button">Download All Data (ZIP)</button>
+                </div>
+            </div>
+        </div>
+        <!-- MODIFICATION END -->
+   
+
+    <!-- Tab: Invoices -->
+    <div id="invoices-tab" class="tab-content active">
+        <div class="hr-layout" style="grid-template-columns: 1fr 2.5fr;">
+            <!-- Left Panel: Filters -->
+            <div class="form-card">
+                <h3>Filter Invoices</h3>
+                <div class="input-group">
+                    <label>Search</label>
+                    <input type="text" id="inv-search" placeholder="Client, Project, Code...">
+                </div>
+                <div class="input-group">
+                    <label>Sort By</label>
+                    <select id="inv-sort-by">
+                        <option value="date-desc">Date (Newest First)</option>
+                        <option value="date-asc">Date (Oldest First)</option>
+                        <option value="amount-desc">Amount (High to Low)</option>
+                        <option value="amount-asc">Amount (Low to High)</option>
+                        <option value="client">Client Name</option>
+                        <option value="project">Project Name</option>
+                        <option value="location">Location</option>
+                    </select>
+                </div>
+                <!-- MODIFICATION START: Date Range Filters -->
+                <div class="input-group">
+                    <label for="inv-date-start">Date From</label>
+                    <input type="date" id="inv-date-start">
+                </div>
+                <div class="input-group">
+                    <label for="inv-date-end">Date To</label>
+                    <input type="date" id="inv-date-end">
+                </div>
+                <!-- MODIFICATION END -->
+                <div class="input-group">
+                    <label>Project Type</label>
+                    <select id="inv-filter-type">
+                        <option value="">All Types</option>
+                        <option value="Residential">Residential</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Interior">Interior</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Min Amount</label>
+                    <input type="number" id="inv-min-amount" placeholder="0">
+                </div>
+                <div class="input-group">
+                    <label>Max Amount</label>
+                    <input type="number" id="inv-max-amount" placeholder="Any">
+                </div>
+                <div class="input-group">
+                    <label>Fee Percentage</label>
+                    <input type="number" id="inv-fee-percent" placeholder="Minimum %">
+                </div>
+                <div class="input-group">
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="inv-filter-referral"> Has Referral Fee</label>
+                    </div>
+                </div>
+                <button id="inv-reset-btn" class="secondary-button" style="width: 100%;">Reset Filters</button>
+            </div>
+            <!-- Right Panel: Table -->
+            <div class="tool-card">
+                <h3>All Raised Invoices</h3>
+                <div class="table-container">
+                    <table class="output-table" id="invoices-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Invoice No</th>
+                                <th>Project</th>
+                                <th>Client</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                                <th style="text-align:right;">Amount (AED)</th>
+                                <th style="text-align:right;">Received</th>
+                                <th style="text-align:center;">Fee %</th>
+                                <th>Referral</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoices-list-body"></tbody>
+                    </table>
+                </div>
+                <!-- MODIFICATION START: Enhanced Totals Section -->
+                <div style="margin-top:15px; border-top: 1px solid #eee; padding-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Total Invoiced:</strong> <span id="inv-total-amount">AED 0.00</span></div>
+                    <div><strong>Total Received:</strong> <span id="inv-total-received">AED 0.00</span></div>
+                    <div><strong>Total Referral Fee:</strong> <span id="inv-total-referral">AED 0.00</span></div>
+                    <div><strong>Output VAT (5%):</strong> <span id="inv-total-vat">AED 0.00</span></div>
+                    <div style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; font-weight: bold; font-size: 1.1em;">
+                        <strong>Amount Outstanding:</strong> <span id="inv-total-outstanding">AED 0.00</span>
+                    </div>
+                </div>
+                <!-- MODIFICATION END -->
+            </div>
+        </div>
+    </div>
+ </div>
+    <!-- Staff Details Modal -->
+    <div id="staff-details-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 900px;">
+            <span id="staff-details-modal-close-btn" class="modal-close-btn">×</span>
+            <h2 id="staff-modal-title">Staff Details</h2>
+            <div id="staff-modal-body" class="modal-body">
+                <div class="hr-layout">
+                    <div class="form-card">
+                        <img id="staff-photo-preview" src="placeholder.jpg" alt="Staff Photo"
+                            class="staff-photo-preview" />
+                        <div class="input-group"><label>Update Photo</label><input type="file" id="staff-photo-upload"
+                                accept="image/*"></div>
+                        <div class="input-group"><label>Update Passport</label><input type="file"
+                                id="staff-passport-upload" accept="image/*,application/pdf"><a id="staff-passport-link"
+                                href="#" target="_blank" style="display:none;">View Current</a></div>
+                    </div>
+                    <div>
+                        <div class="input-group-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="input-group"><label>Name</label><input type="text" id="modal-staff-name"></div>
+                            <div class="input-group"><label>Role</label><input type="text" id="modal-staff-role"></div>
+                            <div class="input-group"><label>Email</label><input type="email" id="modal-staff-email">
+                            </div>
+                            <div class="input-group"><label>Date of Birth</label><input type="date"
+                                    id="modal-staff-dob"></div>
+                            <div class="input-group"><label>Phone No.</label><input type="text" id="modal-staff-phone">
+                            </div>
+                            <div class="input-group"><label>Emirates ID</label><input type="text" id="modal-staff-eid">
+                            </div>
+                            <div class="input-group"><label>Join Date</label><input type="date"
+                                    id="modal-staff-join-date"></div>
+                            <div class="input-group"><label>Gross Salary</label><input type="number"
+                                    id="modal-staff-salary"><span id="modal-basic-salary"
+                                    class="basic-salary-display"></span></div>
+                        </div>
+                        <div class="input-group"><label>Address</label><textarea id="modal-staff-address"
+                                rows="2"></textarea></div>
+                        <div class="input-group-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                            <div class="input-group"><label>Visa Expiry</label><input type="date"
+                                    id="modal-visa-expiry"></div>
+                            <div class="input-group"><label>S.O.E. Expiry</label><input type="date"
+                                    id="modal-soe-expiry"></div>
+                            <div class="input-group"><label>License Expiry</label><input type="date"
+                                    id="modal-license-expiry"></div>
+                            <div class="input-group"><label>Health Card Expiry</label><input type="date"
+                                    id="modal-health-expiry"></div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h4>Staff Loans</h4>
+                <div class="input-group-grid" style="grid-template-columns: 1fr 1fr 2fr auto; align-items:flex-end;">
+                    <div class="input-group"><label>Loan Amount</label><input type="number" id="modal-loan-amount">
+                    </div>
+                    <div class="input-group"><label>Date</label><input type="date" id="modal-loan-date"></div>
+                    <div class="input-group"><label>Description</label><input type="text" id="modal-loan-description">
+                    </div>
+                    <button id="add-loan-btn" class="secondary-button">Add Loan</button>
+                </div>
+                <table class="output-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-loan-history"></tbody>
+                </table>
+                <div style="text-align:right; margin-top: 20px;">
+                    <button id="delete-staff-btn" class="danger-button" style="display:none; float:left;">Delete Staff
+                        Member</button>
+                    <button id="save-staff-details-btn" class="primary-button">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 3D Dependencies (Three.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- HDR Environment Loader -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- MODIFICATION: Add JSZip for ZIP export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/wm_base64.js"></script>
+    <script src="js/logo_base64.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/letter_formats.js"></script>
+    <script src="js/letter_templates.js"></script>
+    <script src="js/pdf_generator.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/efficiency_analyzer.js"></script>
+    <script src="js/hr_management.js"></script>
+
+</body>
+
+</html>

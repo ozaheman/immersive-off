@@ -1,0 +1,916 @@
+<!-- ... START OF FILE ... -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIM Editor: Gizmo & Undo</title>
+    <style>
+        :root { --bg: #1e1e1e; --panel: #252526; --text: #cccccc; --accent: #007acc; --border: #333; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        #main-container { display: flex; flex: 1; height: calc(100% - 200px); }
+        #sidebar { width: 320px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+        #viewer-container { flex: 1; position: relative; background: #000; overflow: hidden; outline: none; }
+        #script-panel { height: 200px; background: #111; border-top: 2px solid var(--accent); display: flex; flex-direction: column; }
+        #script-toolbar { padding: 8px; background: #2d2d30; display: flex; gap: 10px; border-bottom: 1px solid var(--border); align-items: center; }
+        textarea { flex: 1; background: #1e1e1e; color: #9cdcfe; border: none; padding: 10px; font-family: monospace; resize: none; outline: none; }
+        .group { padding: 10px; border-bottom: 1px solid var(--border); }
+        .group h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; color: #888; letter-spacing: 1px; }
+        label { display: block; font-size: 11px; margin-top: 6px; margin-bottom: 2px; color: #aaa; }
+        input, select { width: 100%; background: #3c3c3c; border: 1px solid #555; color: white; padding: 4px; box-sizing: border-box; }
+        .row { display: flex; gap: 5px; } .row > div { flex: 1; }
+        button { width: 100%; padding: 6px; cursor: pointer; background: #444; color: white; border: 1px solid #555; margin-top: 5px; }
+        button:hover { background: #555; }
+        button.primary { background: var(--accent); border-color: var(--accent); }
+        button.danger { background: #c0392b; border-color: #c0392b; }
+        .tool-btn { width: auto; padding: 5px 10px; margin: 0; }
+        .active-tool { background: var(--accent); border-color: #fff; }
+        #gizmo-bar { position: absolute; top: 10px; left: 10px; display: flex; gap: 5px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px; }
+        #undo-bar { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+    </style>
+    
+    <!-- Three.js Core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Gizmo Control -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+    <!-- HDR Environment Loader -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+
+</head>
+<body>
+
+<div id="main-container">
+    <div id="sidebar">
+        <div class="group">
+            <h4>1. Edit Selection</h4>
+            <div class="row">
+                <div><label>ID</label><input type="number" id="e-id" oninput="App.onLiveEdit()"></div>
+                <div><label>Floor</label><input type="text" id="e-floor" oninput="App.onLiveEdit()"></div>
+            </div>
+            <label>Material</label>
+            <select id="e-mat" onchange="App.onLiveEdit()">
+                <option value="ghost">GHOST</option>
+<option value="air">AIR</option>
+<option value="active">ACTIVE</option>
+<option value="concrete">CONCRETE</option>
+<option value="block">BLOCK</option>
+<option value="plaster">PLASTER</option>
+<option value="paint">PAINT</option>
+<option value="glass">GLASS</option>
+<option value="ground">GROUND</option>
+<option value="mep">MEP</option>
+<option value="steel">STEEL</option>
+<option value="aluminium">ALUMINIUM</option>
+<option value="water">WATER</option>
+<option value="paving">PAVING</option>
+<option value="brick">BRICK</option>
+<option value="gypsumBoard">GYPSUM BOARD</option>
+<option value="insulation">INSULATION</option>
+<option value="asphalt">ASPHALT</option>
+<option value="rubber">RUBBER</option>
+<option value="wood">WOOD</option>
+<option value="ceilingTile">CEILING TILE</option>
+<option value="aluminium_pbr">ALUMINIUM PBR</option>
+<option value="asphalt_pbr">ASPHALT PBR</option>
+<option value="bitumen_pbr">BITUMEN PBR</option>
+<option value="cladding_pbr">CLADDING PBR</option>
+<option value="concrete_pbr">CONCRETE PBR</option>
+<option value="glass_pbr">GLASS PBR</option>
+<option value="granite_pbr">GRANITE PBR</option>
+<option value="ground_pbr">GROUND PBR</option>
+<option value="gypsum_pbr">GYPSUM PBR</option>
+<option value="marble_pbr">MARBLE PBR</option>
+<option value="masonary_pbr">MASONARY PBR</option>
+<option value="mesh_pbr">MESH PBR</option>
+<option value="metal_pbr">METAL PBR</option>
+<option value="paver_pbr">PAVER PBR</option>
+<option value="plastic_pbr">PLASTIC PBR</option>
+<option value="sand_pbr">SAND PBR</option>
+<option value="screed_pbr">SCREED PBR</option>
+<option value="tile_pbr">TILE PBR</option>
+<option value="water_pbr">WATER PBR</option>
+<option value="wood_pbr">WOOD PBR</option>
+<option value="logoua">LOGOUA</option>
+<option value="logoua1">LOGOUA1</option>
+<option value="logo1">LOGO1</option>
+<option value="logo2">LOGO2</option>
+
+
+            </select>
+            
+            <label>Position (X / Y / Z)</label>
+            <div class="row">
+                <div><input type="number" id="e-tx" step="0.5" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-ty" step="0.5" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-tz" step="0.5" oninput="App.onLiveEdit()"></div>
+            </div>
+
+            <label>Rotation (Deg X / Y / Z)</label>
+            <div class="row">
+                <div><input type="number" id="e-rx" step="15" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-ry" step="15" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-rz" step="15" oninput="App.onLiveEdit()"></div>
+            </div>
+
+            <label>Scale (X / Y / Z)</label>
+            <div class="row">
+                <div><input type="number" id="e-sx" step="0.1" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-sy" step="0.1" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-sz" step="0.1" oninput="App.onLiveEdit()"></div>
+            </div>
+
+            <div style="margin-top:10px;">
+                <button class="danger" onclick="App.deleteSelected()">Delete Selected</button>
+            </div>
+        </div>
+
+        <div class="group">
+            <h4>2. Geometry Data</h4>
+            <label>Type</label>
+            <select id="e-type" onchange="App.onLiveEdit()">
+                <option value="BoxGeometry">Box</option>
+                <option value="CylinderGeometry">Cylinder</option>
+                <option value="PlaneGeometry">Plane</option>
+            </select>
+            <label>Params (W/H/D or R_Top/R_Bot/H)</label>
+            <div class="row">
+                <div><input type="number" id="e-d1" step="0.1" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-d2" step="0.1" oninput="App.onLiveEdit()"></div>
+                <div><input type="number" id="e-d3" step="0.1" oninput="App.onLiveEdit()"></div>
+            </div>
+        </div>
+
+        <div class="group">
+            <h4>3. Tools</h4>
+            <button onclick="App.copySelected()">Copy Selected</button>
+            <button id="tool-put-geometry" onclick="App.startPlacing()">Create from UI</button>
+            
+            <label>Array Generator</label>
+            <div class="row">
+                <div style="flex:0.8"><label>Count</label><input type="number" id="arr-cnt" value="3"></div>
+                <div><label>X-Off</label><input type="number" id="arr-x" value="2.0"></div>
+                <div><label>Y-Off</label><input type="number" id="arr-y" value="0.0"></div>
+                <div><label>Z-Off</label><input type="number" id="arr-z" value="0.0"></div>
+            </div>
+            <button onclick="App.runArray()">Run Array</button>
+
+            <div style="border-top:1px solid #444; margin-top:5px; padding-top:5px;">
+                <label>Boolean Operation</label>
+                <button onclick="App.booleanOp('subtract')">Subtract Overlapping</button>
+                <button onclick="App.booleanOp('union')">Union Overlapping</button>
+            </div>
+            <div style="border-top:1px solid #444; margin-top:5px; padding-top:5px;">
+                <label>UV Map</label>
+                <button onclick="App.uvMap('box')">Box Projection</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="viewer-container" tabindex="0">
+        <div id="gizmo-bar">
+            <button class="tool-btn active-tool" id="mode-translate" onclick="App.setMode('translate')">Move</button>
+            <button class="tool-btn" id="mode-rotate" onclick="App.setMode('rotate')">Rotate</button>
+            <button class="tool-btn" id="mode-scale" onclick="App.setMode('scale')">Scale</button>
+            <button class="tool-btn" id="btn-space" onclick="App.toggleSpace()">Space: World</button>
+        </div>
+        <div id="undo-bar">
+            <button class="tool-btn" onclick="History.undo()">&#8630; Undo</button>
+            <button class="tool-btn" onclick="History.redo()">&#8631; Redo</button>
+        </div>
+    </div>
+</div>
+
+<div id="script-panel">
+    <div id="script-toolbar">
+        <button class="primary" style="width:auto;" onclick="App.loadFromScript()">1. Load Script to Model</button>
+        <button class="primary" style="width:auto;" onclick="App.generateScript()">2. Rewrite Script from Model</button>
+        <span style="color:#666; font-size:11px; margin-left:auto;">Paste generateStructure() below</span>
+    </div>
+    <textarea id="code-area" spellcheck="false"></textarea>
+</div>
+
+
+<!-- =================================================================== -->
+<!-- START: Embedded ThreeCSG.js to fix CDN/MIME type errors permanently -->
+<!-- =================================================================== -->
+<script>
+var ThreeCSG = (function(){'use strict';var e,t,i,n,r,o,s,l;return e=THREE.Vector3,t=THREE.Vector2,i=THREE.Face3,n=THREE.Geometry,r=THREE.Mesh,s=function(a,c,u){var h,p,d,f,m,y,g,v,_,w;for(h=this,a instanceof n?h.matrix=new THREE.Matrix4:a instanceof r?(a.updateMatrix(),h.matrix=a.matrix.clone(),a=a.geometry):a instanceof o?void(h.tree=a,h.matrix=new THREE.Matrix4):_w("ThreeBSP: Given geometry is not supported"),p=h.polygons=[],d=a.faces,m=a.vertices,y=a.faceVertexUvs[0],f=0,g=d.length;g>f;f++)if(v=d[f],_=new l,v instanceof i)w=y[f],c=m[v.a],u=w?new t(w[0].x,w[0].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[0],u),c.applyMatrix4(h.matrix),_.vertices.push(c),c=m[v.b],u=w?new t(w[1].x,w[1].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[1],u),c.applyMatrix4(h.matrix),_.vertices.push(c),c=m[v.c],u=w?new t(w[2].x,w[2].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[2],u),c.applyMatrix4(h.matrix),_.vertices.push(c);else{if(!(v instanceof THREE.Face4))throw"Invalid face type at index "+f;w=y[f],c=m[v.a],u=w?new t(w[0].x,w[0].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[0],u),c.applyMatrix4(h.matrix),_.vertices.push(c),c=m[v.b],u=w?new t(w[1].x,w[1].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[1],u),c.applyMatrix4(h.matrix),_.vertices.push(c),c=m[v.c],u=w?new t(w[2].x,w[2].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[2],u),c.applyMatrix4(h.matrix),_.vertices.push(c),c=m[v.d],u=w?new t(w[3].x,w[3].y):null,c=new s.Vertex(c.x,c.y,c.z,v.vertexNormals[3],u),c.applyMatrix4(h.matrix),_.vertices.push(c)}_.calculateProperties(),p.push(_);h.tree=new o(p)},s.prototype.subtract=function(e){var t=this.tree.clone(),i=e.tree.clone();return t.invert(),t.clipTo(i),i.clipTo(t),i.invert(),i.clipTo(t),i.invert(),t.build(i.allPolygons()),t.invert(),new s(t)},s.prototype.union=function(e){var t=this.tree.clone(),i=e.tree.clone();return t.clipTo(i),i.clipTo(t),i.invert(),i.clipTo(t),i.invert(),t.build(i.allPolygons()),new s(t)},s.prototype.intersect=function(e){var t=this.tree.clone(),i=e.tree.clone();return t.invert(),i.clipTo(t),i.invert(),t.clipTo(i),i.clipTo(t),t.build(i.allPolygons()),t.invert(),new s(t)},s.prototype.toGeometry=function(){var e,t,r,o,s,l,a,c,u,h,p;for(e=this,t=new THREE.Matrix4().getInverse(e.matrix),r=new n,o=e.tree.allPolygons(),s=o.length,l=0;s>l;l++)for(a=o[l],c=a.vertices.length,u=2;c>u;u++)h=[],p=a.vertices[0],h.push(new THREE.Vector2(p.uv.x,p.uv.y)),p=new THREE.Vector3(p.x,p.y,p.z),p.applyMatrix4(t),r.vertices.push(p),p=a.vertices[u-1],h.push(new THREE.Vector2(p.uv.x,p.uv.y)),p=new THREE.Vector3(p.x,p.y,p.z),p.applyMatrix4(t),r.vertices.push(p),p=a.vertices[u],h.push(new THREE.Vector2(p.uv.x,p.uv.y)),p=new THREE.Vector3(p.x,p.y,p.z),p.applyMatrix4(t),r.vertices.push(p),r.faces.push(new i(r.vertices.length-3,r.vertices.length-2,r.vertices.length-1,new THREE.Vector3(a.normal.x,a.normal.y,a.normal.z))),r.faceVertexUvs[0].push(h);return r},s.prototype.toMesh=function(e){var t,i;return t=this,i=this.toGeometry(),t=new r(i,e),t.position.setFromMatrixPosition(this.matrix),t.rotation.setFromRotationMatrix(this.matrix),t},s.Vertex=function(i,n,r,o,s){var l=this;l.x=i,l.y=n,l.z=r,l.normal=o||new e,l.uv=s||new t},s.Vertex.prototype.clone=function(){var e=this;return new s.Vertex(e.x,e.y,e.z,e.normal.clone(),e.uv.clone())},s.Vertex.prototype.add=function(e){var t=this;return t.x+=e.x,t.y+=e.y,t.z+=e.z,t},s.Vertex.prototype.subtract=function(e){var t=this;return t.x-=e.x,t.y-=e.y,t.z-=e.z,t},s.Vertex.prototype.multiplyScalar=function(e){var t=this;return t.x*=e,t.y*=e,t.z*=e,t},s.Vertex.prototype.cross=function(e){var t=this,i=t.x,n=t.y,r=t.z;return t.x=n*e.z-r*e.y,t.y=r*e.x-i*e.z,t.z=i*e.y-n*e.x,t},s.Vertex.prototype.normalize=function(){var e=this,t=Math.sqrt(e.x*e.x+e.y*e.y+e.z*e.z);return e.x/=t,e.y/=t,e.z/=t,e},s.Vertex.prototype.dot=function(e){var t=this;return t.x*e.x+t.y*e.y+t.z*e.z},s.Vertex.prototype.lerp=function(e,t){var i=this;return i.add(e.clone().subtract(i).multiplyScalar(t)),i.normal.add(e.normal.clone().sub(i.normal).multiplyScalar(t)),i.uv.add(e.uv.clone().sub(i.uv).multiplyScalar(t)),i},s.Vertex.prototype.interpolate=function(e,t){var i=this;return i.clone().lerp(e,t)},s.Vertex.prototype.applyMatrix4=function(e){var t=this,i=t.x,n=t.y,r=t.z,o=e.elements;return t.x=o[0]*i+o[4]*n+o[8]*r+o[12],t.y=o[1]*i+o[5]*n+o[9]*r+o[13],t.z=o[2]*i+o[6]*n+o[10]*r+o[14],t},l=function(e){var t=this;t.vertices=e||[],t.vertices.length?t.calculateProperties():t.normal=t.w=void 0},l.prototype.calculateProperties=function(){var e=this,t=e.vertices[0],i=e.vertices[1],n=e.vertices[2];return e.normal=i.clone().subtract(t).cross(n.clone().subtract(t)).normalize(),e.w=e.normal.clone().dot(t),e},l.prototype.clone=function(){var e,t,i;for(e=this,t=new l,i=0;i<e.vertices.length;i++)t.vertices.push(e.vertices[i].clone());return t.calculateProperties(),t},l.prototype.flip=function(){var e,t;for(e=this,t=[],e.normal.multiplyScalar(-1),e.w*=-1,i=e.vertices.length-1;i>=0;i--)e.vertices[i].normal.multiplyScalar(-1),t.push(e.vertices[i]);return e.vertices=t,e},l.prototype.classifyVertex=function(e){var t=this,i=t.normal.dot(e)-t.w;return-1e-5>i?2:i>1e-5?1:0},l.prototype.classifySide=function(e){var t,i,n,r,o,s;for(t=this,i=0,n=0,r=e.vertices.length,o=0;r>o;o++)s=t.classifyVertex(e.vertices[o]),1===s?i++:2===s&&n++;return i>0&&0===n?1:0===i&&n>0?2:0===i&&0===n?0:3},l.prototype.splitPolygon=function(e,t,i,n,r){var o,s,a,c,u,h,p,d,f,m,y;if(o=this,s=o.classifySide(e),0===s)(o.normal.dot(e.normal)>0?t:i).push(e);else if(1===s)n.push(e);else if(2===s)r.push(e);else for(a=[],c=[],u=e.vertices.length,h=0;u>h;h++)p=(h+1)%u,d=e.vertices[h],f=e.vertices[p],m=o.classifyVertex(d),y=o.classifyVertex(f),2!==m&&a.push(d),1!==m&&c.push(d),3===(m|y)&&(t=(o.w-o.normal.dot(d))/o.normal.dot(f.clone().subtract(d)),i=d.interpolate(f,t),a.push(i),c.push(i));a.length>=3&&n.push(new l(a).calculateProperties()),c.length>=3&&r.push(new l(c).calculateProperties())},o=function(e){var t=this;t.polygons=[],e&&t.build(e)},o.prototype.clone=function(){var e,t;return e=this,t=new o,t.divider=e.divider&&e.divider.clone(),t.polygons=e.polygons.map(function(e){return e.clone()}),t.front=e.front&&e.front.clone(),t.back=e.back&&e.back.clone(),t},o.prototype.invert=function(){var e=this;return e.polygons.forEach(function(e){e.flip()}),e.divider&&e.divider.flip(),e.front&&e.front.invert(),e.back&&e.back.invert(),e.front&&((e=e.front,t=e.back,e.back=t,e.front=t,e=t),e=e.back,t=e.front,e.front=e.back,e.back=t),e},o.prototype.clipPolygons=function(e){var t,i;return t=this,t.divider?(i=[],t.front&&t.front.clipPolygons(e).forEach(function(e){i.push(e)}),t.back&&t.back.clipPolygons(e).forEach(function(e){i.push(e)}),e=[],t.polygons.forEach(function(n){t.divider.splitPolygon(n,e,e,i,i)}),i):i=e.slice(0),i},o.prototype.clipTo=function(e){var t=this;t.polygons=e.clipPolygons(t.polygons),t.front&&t.front.clipTo(e),t.back&&t.back.clipTo(e)},o.prototype.allPolygons=function(){var e=this,t=e.polygons.slice(0);return e.front&&e.front.allPolygons().forEach(function(e){t.push(e)}),e.back&&e.back.allPolygons().forEach(function(e){t.push(e)}),t},o.prototype.build=function(e){var t,i,n,r;if(t=this,t.divider||(t.divider=e[0].clone()),t.front||(t.front=new o),t.back||(t.back=new o),i=[],n=[],e.forEach(function(e){t.divider.splitPolygon(e,t.polygons,t.polygons,i,n)}),i.length>0&&(r||(r=t.front),r.build(i)),n.length>0){if(!r||r!==t.back)r=t.back;r.build(n)}},s})();
+</script>
+<!-- =================================================================== -->
+<!--  END: Embedded ThreeCSG.js -->
+<!-- =================================================================== -->
+
+
+<script>
+/* =========================================
+   1. HISTORY SYSTEM (Undo/Redo)
+   ========================================= */
+const History = (() => {
+    let stack = []; let ptr = -1; const LIMIT = 50;
+    function save(stateObjects) {
+        if (ptr < stack.length - 1) stack = stack.slice(0, ptr + 1);
+        const snapshot = JSON.parse(JSON.stringify(stateObjects.map(o => o.config)));
+        stack.push(snapshot);
+        if (stack.length > LIMIT) stack.shift(); else ptr++;
+    }
+    function undo() { if (ptr > 0) { ptr--; Engine.restoreState(stack[ptr]); App.generateScript(); } }
+    function redo() { if (ptr < stack.length - 1) { ptr++; Engine.restoreState(stack[ptr]); App.generateScript(); } }
+    function clear() { stack = []; ptr = -1; }
+    return { save, undo, redo, clear };
+})();
+
+/* =========================================
+   2. ENGINE: 3D Scene & Gizmos
+   ========================================= */
+const Engine = (() => {
+    let scene, camera, renderer, controls, raycaster, tControls;
+    let objects = []; let selection = null; let draggingGizmo = false;
+    let isPlacing = false; let placementConfig = null; let placementPlane, previewMesh;
+    // --- MATERIALS ---
+
+
+const textureLoader = new THREE.TextureLoader();
+
+function loadPBR(path) {
+    return {
+        map: textureLoader.load(`${path}/albedo.jpg`),
+        normalMap: textureLoader.load(`${path}/normal.jpg`),
+        roughnessMap: textureLoader.load(`${path}/roughness.jpg`),
+        metalnessMap: textureLoader.load(`${path}/metalness.jpg`)
+    };
+}
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const MATS = {
+    // Existing
+    ghost: new THREE.MeshBasicMaterial({
+        color: 0x888888,
+        wireframe: true,
+        opacity: 0.1,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    air: new THREE.MeshPhongMaterial({
+        color: 0x888888,
+        opacity: 0.0,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    active: new THREE.MeshLambertMaterial({
+        color: 0xf39c12,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide
+    }),
+
+    concrete: new THREE.MeshLambertMaterial({
+        color: 0x95a5a6,
+        side: THREE.DoubleSide
+    }),
+
+    block: new THREE.MeshLambertMaterial({
+        color: 0xc0392b,
+        side: THREE.DoubleSide
+    }),
+
+    plaster: new THREE.MeshLambertMaterial({
+        color: 0xecf0f1,
+        side: THREE.DoubleSide
+    }),
+
+    paint: new THREE.MeshLambertMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide
+    }),
+
+    glass: new THREE.MeshPhongMaterial({
+        color: 0x3498db,
+        opacity: 0.6,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    ground: new THREE.MeshLambertMaterial({
+        color: 0x8d6e63,
+        side: THREE.DoubleSide
+    }),
+
+    mep: new THREE.MeshStandardMaterial({
+        color: 0x2980b9,
+        metalness: 0.5,
+        roughness: 0.4,
+        side: THREE.DoubleSide
+    }),
+
+    steel: new THREE.MeshStandardMaterial({
+        color: 0x444444,
+        metalness: 0.7,
+        roughness: 0.2,
+        side: THREE.DoubleSide
+    }),
+
+    aluminium: new THREE.MeshStandardMaterial({
+        color: 0xb0b0b0,
+        metalness: 0.8,
+        roughness: 0.25,
+        side: THREE.DoubleSide
+    }),
+
+    water: new THREE.MeshPhongMaterial({
+        color: 0x00aaff,
+        opacity: 0.6,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    paving: new THREE.MeshLambertMaterial({
+        color: 0xa1887f,
+        side: THREE.DoubleSide
+    }),
+
+    // --- NEW ARCHITECTURAL MATERIALS ---
+    brick: new THREE.MeshLambertMaterial({
+        color: 0xb55239,
+        side: THREE.DoubleSide
+    }),
+
+    gypsumBoard: new THREE.MeshLambertMaterial({
+        color: 0xf5f5f5,
+        side: THREE.DoubleSide
+    }),
+
+    insulation: new THREE.MeshLambertMaterial({
+        color: 0xf1c40f,
+        opacity: 0.9,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    asphalt: new THREE.MeshStandardMaterial({
+        color: 0x2c2c2c,
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    rubber: new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.85,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    wood: new THREE.MeshStandardMaterial({
+        color: 0x8e5a2a,
+        roughness: 0.6,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+    }),
+
+    ceilingTile: new THREE.MeshLambertMaterial({
+        color: 0xeaeaea,
+        side: THREE.DoubleSide
+    }),
+
+    // --- PHYSICAL MATERIALS WITH BITMAPS ---
+    aluminium_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('./js/textures/aluminium'),
+        metalness: 1.0,
+        roughness: 0.25,
+        clearcoat: 0.4,
+        side: THREE.DoubleSide
+    }),
+
+    asphalt_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('./js/textures/asphalt'),
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    bitumen_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('./js/textures/bitumen'),
+        roughness: 0.95,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    cladding_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('./js/textures/cladding'),
+        roughness: 0.6,
+        metalness: 0.2,
+        side: THREE.DoubleSide
+    }),
+
+    concrete_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('./js/textures/concrete'),
+        roughness: 0.85,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    glass_pbr: new THREE.MeshPhysicalMaterial({
+        transmission: 1.0,
+        thickness: 0.02,
+        roughness: 0.05,
+        metalness: 0.0,
+        ior: 1.5,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    granite_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/granite'),
+        roughness: 0.6,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    ground_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/ground'),
+        roughness: 1.0,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    gypsum_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/gypsum'),
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    marble_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/marble'),
+        roughness: 0.35,
+        metalness: 0.0,
+        clearcoat: 0.3,
+        side: THREE.DoubleSide
+    }),
+
+    masonary_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/masonary'),
+        roughness: 0.8,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    mesh_pbr: new THREE.MeshPhysicalMaterial({
+        color: 0x666666,
+        wireframe: true,
+        side: THREE.DoubleSide
+    }),
+
+    metal_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/metal'),
+        metalness: 1.0,
+        roughness: 0.35,
+        side: THREE.DoubleSide
+    }),
+
+    paver_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/paver'),
+        roughness: 0.75,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    plastic_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/plastic'),
+        roughness: 0.4,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    sand_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/sand'),
+        roughness: 1.0,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    screed_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/screed'),
+        roughness: 0.85,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+
+    tile_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/tile'),
+        roughness: 0.45,
+        metalness: 0.0,
+        clearcoat: 0.2,
+        side: THREE.DoubleSide
+    }),
+
+    water_pbr: new THREE.MeshPhysicalMaterial({
+        transmission: 0.9,
+        roughness: 0.1,
+        thickness: 0.5,
+        ior: 1.33,
+        transparent: true,
+        side: THREE.DoubleSide
+    }),
+
+    wood_pbr: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/wood'),
+        roughness: 0.65,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+        logoua: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/logoua'),
+        roughness: 0.65,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+          logoua1: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/logoua1'),
+        roughness: 0.65,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+          logo1: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/logo1'),
+        roughness: 0.65,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    }),
+          logo2: new THREE.MeshPhysicalMaterial({
+        ...loadPBR('/js/textures/logo2'),
+        roughness: 0.65,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    })
+};
+    function init(domId) {
+        const el = document.getElementById(domId);
+        scene = new THREE.Scene(); // Background will be set by the HDR loader
+        scene.add(new THREE.GridHelper(60, 60, 0x444444, 0x333333)); scene.add(new THREE.AxesHelper(5));
+        const planeGeo = new THREE.PlaneGeometry(200, 200);
+        const planeMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+        placementPlane = new THREE.Mesh(planeGeo, planeMat); placementPlane.rotation.x = -Math.PI / 2;
+        scene.add(placementPlane);
+        camera = new THREE.PerspectiveCamera(45, el.clientWidth/el.clientHeight, 0.1, 1000); camera.position.set(40,40,40);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        // Tonemapping and encoding for PBR
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+
+        renderer.setSize(el.clientWidth, el.clientHeight);
+        el.appendChild(renderer.domElement);
+        
+        // --- START: HDR Environment Loading ---
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        
+        new THREE.RGBELoader()
+            .setDataType(THREE.UnsignedByteType)
+            .load('./js/textures/hdr/environment.hdr', (texture) => {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.background = envMap;
+                scene.environment = envMap;
+                texture.dispose();
+                pmremGenerator.dispose();
+            }, undefined, (err) => {
+                console.error('An error occurred loading the HDR environment.', err);
+                scene.background = new THREE.Color(0x222222); // Fallback color
+            });
+        // --- END: HDR Environment Loading ---
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        tControls = new THREE.TransformControls(camera, renderer.domElement); tControls.setSpace('world');
+        tControls.addEventListener('dragging-changed', function (event) {
+            controls.enabled = !event.value; draggingGizmo = event.value;
+            if (event.value) History.save(objects); else { if(selection) App.syncUIFromModel(selection.config); App.generateScript(); }
+        });
+        tControls.addEventListener('change', () => {
+            if (draggingGizmo && selection) {
+                const m = selection.mesh;
+                selection.config.pos = { x: m.position.x, y: m.position.y, z: m.position.z };
+                selection.config.rot = { x: m.rotation.x, y: m.rotation.y, z: m.rotation.z };
+                selection.config.scale = { x: m.scale.x, y: m.scale.y, z: m.scale.z };
+                App.syncUIFromModel(selection.config);
+            }
+        });
+        scene.add(tControls);
+        // Reduced light intensity to balance with HDR environment light
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.2); scene.add(hemi);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.3); dir.position.set(20,50,20); scene.add(dir);
+
+        raycaster = new THREE.Raycaster();
+        renderer.domElement.addEventListener('pointerdown', onPointerDown);
+        renderer.domElement.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('keydown', (e) => {
+            if(e.ctrlKey && e.key === 'z') History.undo(); if(e.ctrlKey && e.key === 'y') History.redo();
+            if (e.key === 'Escape' && isPlacing) App.stopPlacing();
+        });
+        animate();
+    }
+    function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+    function createMesh(config) {
+        let geo;
+        if(config.type === 'BoxGeometry') geo = new THREE.BoxGeometry(config.dims[0] || 1, config.dims[1] || 1, config.dims[2] || 1);
+        else if(config.type === 'CylinderGeometry') geo = new THREE.CylinderGeometry(config.dims[0] || 1, config.dims[1] || 1, config.dims[2] || 1, 32);
+        else if(config.type === 'PlaneGeometry') geo = new THREE.PlaneGeometry(config.dims[0] || 1, config.dims[1] || 1);
+        else if(config.type === 'Custom' && config.geo) geo = config.geo.clone();
+        else geo = new THREE.BoxGeometry(1,1,1);
+        const mat = MATS[config.mat] || MATS.concrete;
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(config.pos.x, config.pos.y, config.pos.z);
+        mesh.rotation.set(config.rot.x, config.rot.y, config.rot.z); 
+        mesh.scale.set(config.scale.x, config.scale.y, config.scale.z);
+        return mesh;
+    }
+    function add(config) {
+        const mesh = createMesh(config); scene.add(mesh);
+        const obj = { id: config.id, mesh: mesh, config: config };
+        objects.push(obj); return obj;
+    }
+    function restoreState(stateConfigs) {
+        tControls.detach();
+        objects.forEach(o => { scene.remove(o.mesh); if(o.mesh.geometry) o.mesh.geometry.dispose(); });
+        objects = []; selection = null;
+        if(stateConfigs) { stateConfigs.forEach(cfg => { add(cfg); }); }
+        App.clearUI();
+    }
+    function onPointerDown(event) {
+        if (isPlacing) {
+            if (!previewMesh || !previewMesh.visible) return;
+            History.save(objects);
+            const newConfig = JSON.parse(JSON.stringify(placementConfig));
+            newConfig.pos = { x: previewMesh.position.x, y: previewMesh.position.y, z: previewMesh.position.z };
+            newConfig.id = Date.now() % 10000; add(newConfig); App.generateScript(); return;
+        }
+        if(draggingGizmo) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        const mouse = { x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 };
+        raycaster.setFromCamera(mouse, camera); const meshes = objects.map(o => o.mesh);
+        const intersects = raycaster.intersectObjects(meshes);
+        if (intersects.length > 0) select(intersects[0].object); else deselect();
+    }
+    function onPointerMove(event) {
+        if (!isPlacing || !previewMesh) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        const mouse = { x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 };
+        raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObject(placementPlane);
+        if (intersects.length > 0) {
+            const point = intersects[0].point; const snap = 0.5;
+            previewMesh.position.x = Math.round(point.x / snap) * snap; previewMesh.position.y = Math.round(point.y / snap) * snap;
+            previewMesh.position.z = Math.round(point.z / snap) * snap; previewMesh.visible = true;
+        } else previewMesh.visible = false;
+    }
+    function select(mesh) {
+        const obj = objects.find(o => o.mesh === mesh); if(!obj) return;
+        selection = obj; tControls.attach(mesh); App.populateUI(obj.config);
+    }
+    function deselect() { tControls.detach(); selection = null; App.clearUI(); }
+    function updateObject(config) {
+        if(!selection) return;
+        selection.mesh.position.set(config.pos.x, config.pos.y, config.pos.z); selection.mesh.rotation.set(config.rot.x, config.rot.y, config.rot.z);
+        selection.mesh.scale.set(config.scale.x, config.scale.y, config.scale.z); selection.mesh.material = MATS[config.mat];
+        let dimsChanged = config.type !== selection.config.type || config.dims.join(',') !== selection.config.dims.join(',');
+        if(dimsChanged) {
+            scene.remove(selection.mesh); tControls.detach();
+            const newMesh = createMesh(config); scene.add(newMesh);
+            selection.mesh = newMesh; tControls.attach(newMesh);
+        }
+        selection.config = config;
+    }
+    function deleteSelected() {
+        if(!selection) return; History.save(objects); tControls.detach(); scene.remove(selection.mesh);
+        const idx = objects.indexOf(selection); if(idx > -1) objects.splice(idx, 1);
+        selection = null; App.clearUI();
+    }
+    function setGizmoMode(mode) { tControls.setMode(mode); }
+    function setGizmoSpace(space) { tControls.setSpace(space); }
+    function enterPlacementMode(config) {
+        isPlacing = true; placementConfig = config; controls.enabled = false; deselect();
+        if (previewMesh) scene.remove(previewMesh);
+        previewMesh = createMesh(placementConfig); previewMesh.material = previewMesh.material.clone();
+        previewMesh.material.transparent = true; previewMesh.material.opacity = 0.6; previewMesh.visible = false;
+        scene.add(previewMesh);
+    }
+    function exitPlacementMode() {
+        isPlacing = false; placementConfig = null; controls.enabled = true;
+        if (previewMesh) { scene.remove(previewMesh); previewMesh = null; }
+    }
+    return { 
+        init, add, restoreState, getObjects: () => objects, getSelection: () => selection, 
+        updateObject, deleteSelected, setGizmoMode, setGizmoSpace, getScene: () => scene,
+        enterPlacementMode, exitPlacementMode
+    };
+})();
+
+/* =========================================
+   3. APP LOGIC
+   ========================================= */
+const App = (() => {
+    const el = (id) => document.getElementById(id); const val = (id) => el(id).value; const num = (id) => parseFloat(el(id).value) || 0;
+    let isPlacingGeometry = false;
+    const defaultScript = `const generateStructure = () => {
+    // 1. Fencing
+    const fenceGeo = new THREE.BoxGeometry(0.1, 2, 30);
+    addPart(1, fenceGeo, 15, 1, 0, 1, 1, 1, 0, 0, 0, 'sub', 'steel'); 
+    addPart(1, fenceGeo, -15, 1, 0, 1, 1, 1, 0, 0, 0, 'sub', 'steel');
+
+    // 2. Signboard
+    addPart(2, new THREE.BoxGeometry(2, 1.5, 0.1), 12, 2, 15, 1, 1, 1, 0, -Math.PI/4, 0, 'sub', 'paint');
+
+    // 6. Piles
+    const pileGeo = new THREE.CylinderGeometry(0.2, 0.2, 6);
+    for(let i=-12; i<=12; i+=3) {
+        addPart(6, pileGeo, i, -3, 14, 1, 1, 1, 0, 0, 0, 'sub', 'concrete');
+        addPart(6, pileGeo, i, -3, -14, 1, 1, 1, 0, 0, 0, 'sub', 'concrete');
+    }
+};`;
+    function init() { Engine.init('viewer-container'); el('code-area').value = defaultScript; clearUI(); }
+    function loadFromScript() {
+        History.clear(); Engine.restoreState(null); const script = val('code-area'); const THREE = window.THREE;
+        const addPart = (id, geo, x, y, z, sx, sy, sz, rx, ry, rz, fl, mat) => {
+            let type = geo.type, dims = [];
+            if(type === 'BoxGeometry') dims = [geo.parameters.width, geo.parameters.height, geo.parameters.depth];
+            else if(type === 'CylinderGeometry') dims = [geo.parameters.radiusTop, geo.parameters.radiusBottom, geo.parameters.height];
+            else if(type === 'PlaneGeometry') dims = [geo.parameters.width, geo.parameters.height];
+            Engine.add({ id, floor: fl, mat, type, dims, pos: {x,y,z}, scale: {x:sx,y:sy,z:sz}, rot: {x:rx,y:ry,z:rz} });
+        };
+        try { new Function('THREE', 'addPart', script + "\n if(typeof generateStructure === 'function') generateStructure();")(THREE, addPart); History.save(Engine.getObjects()); } 
+        catch(e) { alert("Script Error: " + e.message); }
+    }
+    
+    let isEditingLive = false;
+    function populateUI(cfg) {
+        isEditingLive = true;
+        el('e-id').value = cfg.id; el('e-floor').value = cfg.floor; el('e-mat').value = cfg.mat;
+        el('e-tx').value = cfg.pos.x.toFixed(2); el('e-ty').value = cfg.pos.y.toFixed(2); el('e-tz').value = cfg.pos.z.toFixed(2);
+        el('e-rx').value = Math.round(THREE.Math.radToDeg(cfg.rot.x)); el('e-ry').value = Math.round(THREE.Math.radToDeg(cfg.rot.y)); el('e-rz').value = Math.round(THREE.Math.radToDeg(cfg.rot.z));
+        el('e-sx').value = cfg.scale.x.toFixed(2); el('e-sy').value = cfg.scale.y.toFixed(2); el('e-sz').value = cfg.scale.z.toFixed(2);
+        el('e-type').value = cfg.type;
+        if(cfg.dims) { el('e-d1').value = cfg.dims[0]||0; el('e-d2').value = cfg.dims[1]||0; el('e-d3').value = cfg.dims[2]||0; }
+        isEditingLive = false;
+    }
+    
+    function clearUI() {
+        isEditingLive = true;
+        el('e-id').value = ''; el('e-floor').value = ''; el('e-mat').selectedIndex = 0;
+        el('e-tx').value = '0'; el('e-ty').value = '0'; el('e-tz').value = '0';
+        el('e-rx').value = '0'; el('e-ry').value = '0'; el('e-rz').value = '0';
+        el('e-sx').value = '1'; el('e-sy').value = '1'; el('e-sz').value = '1';
+        el('e-type').selectedIndex = 0;
+        el('e-d1').value = '1'; el('e-d2').value = '1'; el('e-d3').value = '1';
+        isEditingLive = false;
+    }
+    function syncUIFromModel(cfg) { populateUI(cfg); }
+    function onLiveEdit() {
+        if(isEditingLive || !Engine.getSelection()) return;
+        Engine.updateObject({
+            id: val('e-id'), floor: val('e-floor'), mat: val('e-mat'), type: val('e-type'),
+            dims: [num('e-d1'), num('e-d2'), num('e-d3')],
+            pos: { x:num('e-tx'), y:num('e-ty'), z:num('e-tz') },
+            rot: { x:THREE.Math.degToRad(num('e-rx')), y:THREE.Math.degToRad(num('e-ry')), z:THREE.Math.degToRad(num('e-rz')) },
+            scale: { x:num('e-sx'), y:num('e-sy'), z:num('e-sz') }
+        });
+    }
+    function deleteSelected() { Engine.deleteSelected(); }
+    function setMode(m) {
+        stopPlacing(); Engine.setGizmoMode(m); 
+        document.querySelectorAll('#gizmo-bar .tool-btn').forEach(b => b.classList.remove('active-tool'));
+        el('mode-'+m).classList.add('active-tool');
+    }
+    let currentSpace = 'world';
+    function toggleSpace() {
+        currentSpace = (currentSpace === 'world') ? 'local' : 'world'; Engine.setGizmoSpace(currentSpace);
+        el('btn-space').innerText = "Space: " + (currentSpace.charAt(0).toUpperCase() + currentSpace.slice(1));
+    }
+    function copySelected() {
+        const sel = Engine.getSelection(); if(!sel) { alert("Please select an object to copy first."); return; } History.save(Engine.getObjects());
+        const cfg = JSON.parse(JSON.stringify(sel.config)); cfg.pos.x += 2; Engine.add(cfg);
+    }
+    function runArray() {
+        const sel = Engine.getSelection(); if(!sel) { alert("Please select an object to use as the base for the array."); return; }
+        const count = parseInt(val('arr-cnt'))||1, offX = num('arr-x'), offY = num('arr-y'), offZ = num('arr-z');
+        if(count <= 0) return; History.save(Engine.getObjects()); const base = sel.config;
+        for(let i=1; i<=count; i++) {
+            const cfg = JSON.parse(JSON.stringify(base));
+            cfg.pos.x += (offX * i); cfg.pos.y += (offY * i); cfg.pos.z += (offZ * i);
+            Engine.add(cfg);
+        }
+    }
+    function booleanOp(op) {
+        const sel = Engine.getSelection(); if(!sel) { alert("Please select the primary object first."); return; }
+        const targets = Engine.getObjects().filter(o => o !== sel);
+        const box1 = new THREE.Box3().setFromObject(sel.mesh); let tool = null;
+        for(let t of targets) { if(box1.intersectsBox(new THREE.Box3().setFromObject(t.mesh))) { tool = t; break; } }
+        if(!tool) { alert("No overlapping object found to perform boolean operation."); return; } History.save(Engine.getObjects());
+        try {
+            const bspA = new ThreeBSP(sel.mesh); const bspB = new ThreeBSP(tool.mesh);
+            let res = (op==='subtract') ? bspA.subtract(bspB) : bspA.union(bspB);
+            Engine.getScene().remove(tool.mesh); Engine.getObjects().splice(Engine.getObjects().indexOf(tool), 1);
+            const newCfg = { ...sel.config, type:'Custom', geo: res.toMesh(sel.mesh.material).geometry };
+            Engine.updateObject(newCfg);
+        } catch(e) { console.error("Boolean op failed:", e); alert("Boolean operation failed. Geometries might be invalid."); }
+    }
+    
+    // ===== START OF MODIFIED FUNCTION =====
+    function startPlacing() {
+        if (isPlacingGeometry) { stopPlacing(); return; }
+        
+        // This function NO LONGER requires a selection.
+        // It builds the object config from the UI fields instead.
+        const placementConfig = {
+            type: val('e-type'),
+            dims: [num('e-d1'), num('e-d2'), num('e-d3')],
+            mat: val('e-mat'),
+            floor: val('e-floor') || 'L0', // Use value from UI or fallback
+            id: 0, // Placeholder, will be replaced on click
+            pos: { x: 0, y: 0, z: 0 },
+            rot: { x: 0, y: 0, z: 0 },
+            scale: { x: 1, y: 1, z: 1 }
+        };
+        
+        isPlacingGeometry = true; 
+        Engine.enterPlacementMode(placementConfig);
+        el('tool-put-geometry').classList.add('active-tool'); el('viewer-container').style.cursor = 'copy';
+    }
+    // ===== END OF MODIFIED FUNCTION =====
+
+    function stopPlacing() {
+        if (!isPlacingGeometry) return; isPlacingGeometry = false; Engine.exitPlacementMode();
+        el('tool-put-geometry').classList.remove('active-tool'); el('viewer-container').style.cursor = 'default';
+    }
+
+    function generateScript() {
+        const objects = Engine.getObjects();
+        let code = "const generateStructure = () => {\n    // Generated from BIM Editor\n";
+        const f = (n) => (n % 1 === 0 ? n.toString() : n.toFixed(3));
+        const r = (n) => {
+            const eps = 0.001; if(Math.abs(n) < eps) return '0'; if(Math.abs(n - Math.PI/2) < eps) return 'Math.PI/2';
+            if(Math.abs(n + Math.PI/2) < eps) return '-Math.PI/2'; if(Math.abs(n - Math.PI) < eps) return 'Math.PI';
+            return n.toFixed(4);
+        };
+        objects.forEach(obj => {
+            const c = obj.config;
+            if(c.type === 'Custom') { code += `    // Custom Geometry (ID ${c.id}) - cannot be scripted\n`; return; }
+            let geoStr = "";
+            if(c.type === 'BoxGeometry') geoStr = `new THREE.BoxGeometry(${c.dims.map(f).join(', ')})`;
+            else if(c.type === 'CylinderGeometry') geoStr = `new THREE.CylinderGeometry(${c.dims.map(f).join(', ')}, 32)`;
+            else if(c.type === 'PlaneGeometry') geoStr = `new THREE.PlaneGeometry(${c.dims.map(f).join(', ')})`;
+            code += `    addPart(${c.id}, ${geoStr}, ${f(c.pos.x)}, ${f(c.pos.y)}, ${f(c.pos.z)}, ${f(c.scale.x)}, ${f(c.scale.y)}, ${f(c.scale.z)}, ${r(c.rot.x)}, ${r(c.rot.y)}, ${r(c.rot.z)}, '${c.floor}', '${c.mat}');\n`;
+        });
+        code += "};";
+        el('code-area').value = code;
+    }
+    
+    function uvMap(type) {
+        const sel = Engine.getSelection(); if (!sel) return; const g = sel.mesh.geometry; g.computeBoundingBox();
+        const min = g.boundingBox.min; const range = new THREE.Vector3().subVectors(g.boundingBox.max, min);
+        let uv = g.attributes.uv;
+        if (!uv) { 
+            const newUvs = new Float32Array(g.attributes.position.count * 2);
+            g.setAttribute('uv', new THREE.BufferAttribute(newUvs, 2));
+            uv = g.attributes.uv;
+        }
+        const pos = g.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), z = pos.getZ(i);
+            uv.setXY(i, (x - min.x) / range.x, (z - min.z) / range.z);
+        }
+        uv.needsUpdate = true;
+    }
+
+    return { 
+        init, loadFromScript, generateScript, populateUI, syncUIFromModel, onLiveEdit, clearUI,
+        deleteSelected, setMode, toggleSpace, copySelected, runArray, booleanOp, uvMap,
+        startPlacing, stopPlacing
+    };
+})();
+
+App.init();
+</script>
+
+</body>
+</html>
