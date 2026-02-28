@@ -25,7 +25,7 @@ window.UrbanAxisSchedule = (() => {
         barHeight: 16,
         //barOpacity: 0.5,
         //progressOpacity: 0.6,
-        taskListWidth: 260,
+        taskListWidth: 280,
         currentZoom: 'month',
         zoomLevels: {
             day: { dayWidth: 20 },
@@ -34,7 +34,7 @@ window.UrbanAxisSchedule = (() => {
             year: { dayWidth: 1 }
         },
         // Colors
-         barColor: 'rgba(67, 99, 216, 0.6)',
+        barColor: 'rgba(67, 99, 216, 0.6)',
         criticalColor: 'rgba(255, 77, 77, 0.6)',
         progressBarColor: 'rgba(60, 180, 75, 0.75)',
         gridLineColor: '#e0e0e0',
@@ -50,7 +50,7 @@ window.UrbanAxisSchedule = (() => {
     // --- HELPERS ---
     const createSvgElement = (tag, attributes = {}) => {
         const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
-        
+
         // Explicitly set namespace for html2canvas compatibility
         if (tag === 'svg') {
             el.setAttribute('xmlns', "http://www.w3.org/2000/svg");
@@ -89,7 +89,7 @@ window.UrbanAxisSchedule = (() => {
             const start = parseLocal(t.start).getTime();
             const end = parseLocal(t.end).getTime();
             if (end > projectEndDate) projectEndDate = end;
-            
+
             // Remove self-dependencies
             let cleanDeps = t.dependencies || [];
             if (Array.isArray(cleanDeps)) {
@@ -105,7 +105,7 @@ window.UrbanAxisSchedule = (() => {
                 end: end,
                 predecessors: cleanDeps,
                 successors: [],
-                ls: null, 
+                ls: null,
                 lf: null,
                 isCritical: false
             });
@@ -124,21 +124,21 @@ window.UrbanAxisSchedule = (() => {
         });
 
         // 3. Backward Pass with Cycle Detection
-        const visiting = new Set(); 
+        const visiting = new Set();
 
         const getLateStart = (taskId) => {
             const node = map.get(taskId);
             if (!node) return 0;
-            
+
             if (node.ls !== null) return node.ls;
 
             // CYCLE DETECTION
             if (visiting.has(taskId)) {
                 console.warn(`Circular dependency detected at Task ${taskId}.`);
-                return projectEndDate; 
+                return projectEndDate;
             }
 
-            visiting.add(taskId); 
+            visiting.add(taskId);
 
             let lateFinish;
             if (node.successors.length === 0) {
@@ -148,7 +148,7 @@ window.UrbanAxisSchedule = (() => {
                 lateFinish = Math.min(...successorLateStarts);
             }
 
-            visiting.delete(taskId); 
+            visiting.delete(taskId);
 
             node.lf = lateFinish;
             node.ls = lateFinish - node.duration;
@@ -195,16 +195,16 @@ window.UrbanAxisSchedule = (() => {
                 const duration = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
                 return { ...taskTemplate, ...saved, duration };
             }
-            
+
             const newStartOffset = Math.round(taskTemplate.startOffset * scaleFactor);
             const newDuration = Math.max(1, Math.round(taskTemplate.duration * scaleFactor));
-            
+
             const startDate = new Date(projectStartDate);
             startDate.setDate(startDate.getDate() + newStartOffset);
-            
+
             const endDate = new Date(startDate);
             endDate.setDate(endDate.getDate() + newDuration - 1);
-            
+
             return {
                 ...taskTemplate,
                 start: formatDateLocal(startDate),
@@ -222,18 +222,18 @@ window.UrbanAxisSchedule = (() => {
         //const width = totalDays * dayWidth;// hedit
         const width = svg.getAttribute('width'); // Use actual SVG width
         const height = CONFIG.headerHeight;
-        
+
         const headerGroup = createSvgElement('g', { class: 'header-labels' });
         headerGroup.appendChild(createSvgElement('rect', { x: 0, y: 0, width: width, height: height, fill: '#f8f9fa' }));
 
-        let lastYear = -1; 
+        let lastYear = -1;
         let lastMonth = -1;
-        
+
         for (let i = 0; i <= totalDays; i++) {
-            const date = new Date(ganttStartDate); 
+            const date = new Date(ganttStartDate);
             date.setDate(date.getDate() + i);
             const xPos = i * dayWidth;
-            
+
             // Year
             if (date.getFullYear() !== lastYear) {
                 lastYear = date.getFullYear();
@@ -242,7 +242,7 @@ window.UrbanAxisSchedule = (() => {
                 yearText.textContent = date.getFullYear();
                 headerGroup.appendChild(yearText);
             }
-            
+
             // Month
             if (date.getMonth() !== lastMonth) {
                 lastMonth = date.getMonth();
@@ -260,18 +260,18 @@ window.UrbanAxisSchedule = (() => {
             if (CONFIG.currentZoom === 'week' && date.getDay() === 1 && i !== 0) {
                 headerGroup.appendChild(createSvgElement('line', { x1: xPos, x2: xPos, y1: yTop, y2: height, stroke: '#ddd' }));
                 const dayText = createSvgElement('text', { x: xPos + 3, y: height - 5, 'font-size': '10px', fill: '#777' });
-                dayText.textContent = date.getDate(); 
+                dayText.textContent = date.getDate();
                 headerGroup.appendChild(dayText);
             } else if (CONFIG.currentZoom === 'day') {
                 headerGroup.appendChild(createSvgElement('line', { x1: xPos, x2: xPos, y1: yTop, y2: height, stroke: '#eee' }));
                 const dayText = createSvgElement('text', { x: xPos + 2, y: height - 5, 'font-size': '9px', fill: '#777' });
-                dayText.textContent = date.getDate(); 
+                dayText.textContent = date.getDate();
                 headerGroup.appendChild(dayText);
             }
         }
-        
-        headerGroup.appendChild(createSvgElement('line', { x1: 0, x2: width, y1: height/3, y2: height/3, stroke: '#ddd' }));
-        headerGroup.appendChild(createSvgElement('line', { x1: 0, x2: width, y1: (height/3)*2, y2: (height/3)*2, stroke: '#ddd' }));
+
+        headerGroup.appendChild(createSvgElement('line', { x1: 0, x2: width, y1: height / 3, y2: height / 3, stroke: '#ddd' }));
+        headerGroup.appendChild(createSvgElement('line', { x1: 0, x2: width, y1: (height / 3) * 2, y2: (height / 3) * 2, stroke: '#ddd' }));
         headerGroup.appendChild(createSvgElement('line', { x1: 0, x2: width, y1: height, y2: height, stroke: '#999' }));
         svg.appendChild(headerGroup);
     };
@@ -280,18 +280,18 @@ window.UrbanAxisSchedule = (() => {
         const zoom = CONFIG.zoomLevels[CONFIG.currentZoom];
         const dayWidth = zoom.dayWidth;
         const gridGroup = createSvgElement('g', { class: 'grid-lines' });
-        
+
         for (let i = 0; i <= totalDays; i++) {
-            const date = new Date(ganttStartDate); 
+            const date = new Date(ganttStartDate);
             date.setDate(date.getDate() + i);
             const xPos = i * dayWidth;
-            let isLine = false; 
+            let isLine = false;
             let color = CONFIG.gridLineColor;
-            
+
             if (date.getDate() === 1) { isLine = true; color = CONFIG.dividerLineColor; }
             else if ((CONFIG.currentZoom === 'week' || CONFIG.currentZoom === 'month') && date.getDay() === 1) { isLine = true; }
             else if (CONFIG.currentZoom === 'day') { isLine = true; }
-            
+
             if (isLine) {
                 gridGroup.appendChild(createSvgElement('line', {
                     x1: xPos, x2: xPos, y1: 0, y2: chartHeight, stroke: color, 'stroke-width': 1,
@@ -307,7 +307,7 @@ window.UrbanAxisSchedule = (() => {
         const dayWidth = zoom.dayWidth;
         const tasksGroup = createSvgElement('g', { 'font-family': CONFIG.fontFamily });
         const arrowGroup = createSvgElement('g', { class: 'dependency-arrows' });
-        
+
         const defs = createSvgElement('defs');
         const marker = createSvgElement('marker', {
             id: 'arrowhead', markerWidth: '10', markerHeight: '7',
@@ -327,13 +327,13 @@ window.UrbanAxisSchedule = (() => {
         const criticalSet = identifyCriticalPath(schedule);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const taskCoords = {};
-        
+
         // 1. Calculate Geometry
         schedule.forEach((task, index) => {
             const y = index * CONFIG.rowHeight;
             const taskStartDate = parseLocal(task.start);
             if (isNaN(taskStartDate.getTime())) return;
-            
+
             const startOffsetDays = (taskStartDate - ganttStartDate) / (1000 * 60 * 60 * 24);
             const barX = Math.max(0, startOffsetDays * dayWidth);
             const barWidth = Math.max(dayWidth, task.duration * dayWidth);
@@ -366,13 +366,13 @@ window.UrbanAxisSchedule = (() => {
             const startY = link.source.y;
             const endX = link.target.x;
             const endY = link.target.y;
-            
+
             const cx1 = startX + 15;
             const cy1 = startY;
             const cx2 = endX - 15;
             const cy2 = endY;
             const d = `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
-            
+
             const path = createSvgElement('path', {
                 d: d,
                 stroke: link.isCritical ? CONFIG.criticalDependencyColor : CONFIG.dependencyColor,
@@ -388,10 +388,10 @@ window.UrbanAxisSchedule = (() => {
             const y = index * CONFIG.rowHeight;
             const taskStartDate = parseLocal(task.start);
             if (isNaN(taskStartDate.getTime())) return;
-            
+
             const coords = taskCoords[task.id];
             if (!coords) return;
-            
+
             const barX = coords.x;
             const barWidth = coords.width;
             const isCritical = coords.isCritical;
@@ -402,46 +402,46 @@ window.UrbanAxisSchedule = (() => {
             // Row Background
             const rowBg = createSvgElement('rect', { x: 0, y: y, width: svg.getAttribute('width'), height: CONFIG.rowHeight, fill: index % 2 === 0 ? '#fff' : '#fafafa' });
             const rowLine = createSvgElement('line', { x1: 0, x2: svg.getAttribute('width'), y1: y + CONFIG.rowHeight, y2: y + CONFIG.rowHeight, stroke: '#f0f0f0' });
-            tasksGroup.appendChild(rowBg); 
+            tasksGroup.appendChild(rowBg);
             tasksGroup.appendChild(rowLine);
 
             // Task Bar
             const barGroup = createSvgElement('g', { class: 'gantt-task-bar', 'data-task-id': task.id });
-            const barY = y + (CONFIG.rowHeight - CONFIG.barHeight)/2;
+            const barY = y + (CONFIG.rowHeight - CONFIG.barHeight) / 2;
             const fillColor = isCritical ? CONFIG.criticalColor : CONFIG.barColor;
 
-            const bar = createSvgElement('rect', { 
-                x: barX, y: barY, width: barWidth, height: CONFIG.barHeight, 
+            const bar = createSvgElement('rect', {
+                x: barX, y: barY, width: barWidth, height: CONFIG.barHeight,
                 //fill: fillColor, 'fill-opacity': CONFIG.barOpacity, //hedit
                 fill: fillColor,
-                rx: 3, ry: 3, class: 'gantt-bar-main', style: 'cursor: move;' 
+                rx: 3, ry: 3, class: 'gantt-bar-main', style: 'cursor: move;'
             });
-            
+
             // Progress Bar
             let progress = 0;
             const taskEndDate = parseLocal(task.end);
             if (today > taskEndDate) progress = 100;
-            else if (today >= taskStartDate) { 
-                const elapsed = (today - taskStartDate) / (1000 * 60 * 60 * 24) + 1; 
-                progress = Math.min(100, (elapsed / task.duration) * 100); 
+            else if (today >= taskStartDate) {
+                const elapsed = (today - taskStartDate) / (1000 * 60 * 60 * 24) + 1;
+                progress = Math.min(100, (elapsed / task.duration) * 100);
             }
-            
-            const progressBar = createSvgElement('rect', { 
-                x: barX, y: barY, 
-                width: Math.max(0, barWidth * (progress / 100)), 
-                height: CONFIG.barHeight, 
+
+            const progressBar = createSvgElement('rect', {
+                x: barX, y: barY,
+                width: Math.max(0, barWidth * (progress / 100)),
+                height: CONFIG.barHeight,
                 fill: CONFIG.progressBarColor, //'fill-opacity': CONFIG.progressOpacity,//hedit
-                rx: 3, ry: 3, 'pointer-events': 'none' 
+                rx: 3, ry: 3, 'pointer-events': 'none'
             });
 
             // Handles & Interactions
             if (barWidth > 15) {
                 const handleStart = createSvgElement('rect', { x: barX, y: barY, width: CONFIG.handleWidth, height: CONFIG.barHeight, fill: 'transparent', style: 'cursor: ew-resize;' });
                 const handleEnd = createSvgElement('rect', { x: barX + barWidth - CONFIG.handleWidth, y: barY, width: CONFIG.handleWidth, height: CONFIG.barHeight, fill: 'transparent', style: 'cursor: ew-resize;' });
-                
+
                 handleStart.addEventListener('mousedown', (e) => startDrag(e, 'resize-start', barGroup, bar, dayWidth, ganttStartDate, task));
                 handleEnd.addEventListener('mousedown', (e) => startDrag(e, 'resize-end', barGroup, bar, dayWidth, ganttStartDate, task));
-                
+
                 handleStart.addEventListener('dblclick', (e) => {
                     e.stopPropagation();
                     const newStartStr = prompt("Enter Start Date (YYYY-MM-DD):", task.start);
@@ -460,16 +460,16 @@ window.UrbanAxisSchedule = (() => {
 
                 barGroup.append(handleStart, handleEnd);
             }
-            
+
             bar.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 const newDurationStr = prompt(`Enter Duration for "${task.name}" (Days):`, task.duration);
                 const newDuration = parseInt(newDurationStr);
                 if (!isNaN(newDuration) && newDuration > 0) {
-                     const start = parseLocal(task.start);
-                     const newEnd = new Date(start);
-                     newEnd.setDate(newEnd.getDate() + newDuration - 1);
-                     if (typeof onUpdate === 'function') {
+                    const start = parseLocal(task.start);
+                    const newEnd = new Date(start);
+                    newEnd.setDate(newEnd.getDate() + newDuration - 1);
+                    if (typeof onUpdate === 'function') {
                         onUpdate({ id: task.id, start: task.start, end: formatDateLocal(newEnd) });
                     }
                 }
@@ -477,9 +477,9 @@ window.UrbanAxisSchedule = (() => {
 
             bar.addEventListener('mousedown', (e) => startDrag(e, 'move', barGroup, bar, dayWidth, ganttStartDate, task));
 
-            const title = createSvgElement('title'); 
+            const title = createSvgElement('title');
             title.textContent = `${task.name}\nStart: ${task.start}\nEnd: ${task.end}\nDuration: ${task.duration} days${isCritical ? '\n[CRITICAL PATH]' : ''}`;
-            barGroup.append(bar, progressBar, title); 
+            barGroup.append(bar, progressBar, title);
             tasksGroup.append(barGroup);
         });
 
@@ -492,14 +492,14 @@ window.UrbanAxisSchedule = (() => {
         if (e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        
-        dragState = { 
-            type, task, group, bar, dayWidth, startDate, 
-            startX: e.clientX, 
-            initialX: parseFloat(bar.getAttribute('x')), 
-            initialWidth: parseFloat(bar.getAttribute('width')) 
+
+        dragState = {
+            type, task, group, bar, dayWidth, startDate,
+            startX: e.clientX,
+            initialX: parseFloat(bar.getAttribute('x')),
+            initialWidth: parseFloat(bar.getAttribute('width'))
         };
-        
+
         group.classList.add('dragging');
         document.body.addEventListener('mousemove', handleMouseMove);
         document.body.addEventListener('mouseup', handleMouseUp);
@@ -510,15 +510,15 @@ window.UrbanAxisSchedule = (() => {
         requestAnimationFrame(() => {
             if (!dragState) return;
             const dx = e.clientX - dragState.startX;
-            
+
             if (dragState.type === 'move') {
                 const newX = dragState.initialX + dx;
-                if (newX >= 0) { 
-                    dragState.bar.setAttribute('x', newX); 
-                    dragState.group.setAttribute('transform', `translate(${dx}, 0)`); 
+                if (newX >= 0) {
+                    dragState.bar.setAttribute('x', newX);
+                    dragState.group.setAttribute('transform', `translate(${dx}, 0)`);
                 }
             } else if (dragState.type === 'resize-end') {
-                const newWidth = Math.max(dragState.dayWidth, dragState.initialWidth + dx); 
+                const newWidth = Math.max(dragState.dayWidth, dragState.initialWidth + dx);
                 dragState.bar.setAttribute('width', newWidth);
             }
         });
@@ -526,33 +526,33 @@ window.UrbanAxisSchedule = (() => {
 
     const handleMouseUp = (e) => {
         if (!dragState) return;
-        
-        dragState.group.classList.remove('dragging'); 
+
+        dragState.group.classList.remove('dragging');
         dragState.group.removeAttribute('transform');
-        
+
         if (typeof currentUpdateCallback === 'function') {
             if (dragState.type === 'move') {
                 const dx = e.clientX - dragState.startX;
                 const finalDaysOffset = Math.round((dragState.initialX + dx) / dragState.dayWidth);
-                const newStart = new Date(dragState.startDate); 
+                const newStart = new Date(dragState.startDate);
                 newStart.setDate(newStart.getDate() + finalDaysOffset);
-                const newEnd = new Date(newStart); 
+                const newEnd = new Date(newStart);
                 newEnd.setDate(newEnd.getDate() + parseInt(dragState.task.duration) - 1);
-                
+
                 currentUpdateCallback({ id: dragState.task.id, start: formatDateLocal(newStart), end: formatDateLocal(newEnd) });
             } else if (dragState.type === 'resize-end') {
                 const currentWidth = parseFloat(dragState.bar.getAttribute('width'));
                 const daysDuration = Math.round(currentWidth / dragState.dayWidth);
-                const start = parseLocal(dragState.task.start); 
-                const newEnd = new Date(start); 
+                const start = parseLocal(dragState.task.start);
+                const newEnd = new Date(start);
                 newEnd.setDate(newEnd.getDate() + daysDuration - 1);
-                
+
                 currentUpdateCallback({ id: dragState.task.id, start: dragState.task.start, end: formatDateLocal(newEnd) });
             }
         }
-        
-        document.body.removeEventListener('mousemove', handleMouseMove); 
-        document.body.removeEventListener('mouseup', handleMouseUp); 
+
+        document.body.removeEventListener('mousemove', handleMouseMove);
+        document.body.removeEventListener('mouseup', handleMouseUp);
         dragState = null;
     };
 
@@ -566,200 +566,193 @@ window.UrbanAxisSchedule = (() => {
         currentScheduleData = scheduleData;
         currentUpdateCallback = onUpdate;
         activeContainerId = containerId;
-        
+
         const rootContainer = document.getElementById(containerId);
         if (!rootContainer) {
             console.error(`Gantt Chart: Container #${containerId} not found.`);
             return;
         }
-        
+
         rootContainer.innerHTML = '';
         rootContainer.style.display = 'flex';
         rootContainer.style.flexDirection = 'column';
         rootContainer.style.height = '100%';
-        rootContainer.style.overflowX = 'hidden'; 
+        rootContainer.style.overflowX = 'hidden';
         rootContainer.style.overflowY = 'hidden';
-        
+
         // 1. Zoom Controls
         const controlsDiv = document.createElement('div');
-        controlsDiv.style.padding = '8px 10px'; 
-        controlsDiv.style.borderBottom = '1px solid #ccc'; 
-        controlsDiv.style.background = '#f5f5f5'; 
+        controlsDiv.style.padding = '8px 10px';
+        controlsDiv.style.borderBottom = '1px solid #ccc';
+        controlsDiv.style.background = '#f5f5f5';
         controlsDiv.style.flexShrink = '0';
-        
+
         ['Day', 'Week', 'Month', 'Year'].forEach(level => {
-            const btn = document.createElement('button'); 
-            btn.textContent = level; 
+            const btn = document.createElement('button');
+            btn.textContent = level;
             btn.className = `zoom-btn ${CONFIG.currentZoom === level.toLowerCase() ? 'active' : ''}`;
-            btn.style.marginRight = '5px'; 
-            btn.style.padding = '4px 10px'; 
-            btn.style.border = '1px solid #ccc'; 
-            btn.style.borderRadius = '4px'; 
+            btn.style.marginRight = '5px';
+            btn.style.padding = '4px 10px';
+            btn.style.border = '1px solid #ccc';
+            btn.style.borderRadius = '4px';
             btn.style.cursor = 'pointer';
-            
-            if(CONFIG.currentZoom === level.toLowerCase()) { 
-                btn.style.background = '#4363d8'; 
-                btn.style.color = 'white'; 
-            } else { 
-                btn.style.background = '#eee'; 
-                btn.style.color = '#333'; 
+
+            if (CONFIG.currentZoom === level.toLowerCase()) {
+                btn.style.background = '#4363d8';
+                btn.style.color = 'white';
+            } else {
+                btn.style.background = '#eee';
+                btn.style.color = '#333';
             }
-            
-            btn.onclick = () => { 
-                CONFIG.currentZoom = level.toLowerCase(); 
-                render(currentScheduleData, currentUpdateCallback, activeContainerId); 
+
+            btn.onclick = () => {
+                CONFIG.currentZoom = level.toLowerCase();
+                render(currentScheduleData, currentUpdateCallback, activeContainerId);
             };
             controlsDiv.appendChild(btn);
         });
         rootContainer.appendChild(controlsDiv);
-        
-        // 2. Main Content Wrapper
-        const contentArea = document.createElement('div'); 
-        contentArea.style.display = 'flex'; 
-        contentArea.style.flex = '1'; 
-        contentArea.style.overflow = 'hidden'; 
-        contentArea.style.position = 'relative';
-        rootContainer.appendChild(contentArea);
 
-        // LEFT COLUMN (Tasks)
-        const taskListDiv = document.createElement('div'); 
-        taskListDiv.style.width = `${CONFIG.taskListWidth}px`; 
-        taskListDiv.style.flexShrink = '0'; 
-        taskListDiv.style.borderRight = '1px solid #ccc'; 
-        taskListDiv.style.background = '#fff'; 
-        taskListDiv.style.display = 'flex'; 
-        taskListDiv.style.flexDirection = 'column';
-        taskListDiv.style.zIndex = '2';
-        
-        const leftHeader = document.createElement('div'); 
-        leftHeader.style.height = `${CONFIG.headerHeight}px`; 
-        leftHeader.style.borderBottom = '1px solid #999'; 
-        leftHeader.style.background = '#f8f9fa'; 
-        leftHeader.style.display = 'flex'; 
-        leftHeader.style.alignItems = 'center'; 
-        leftHeader.style.paddingLeft = '10px'; 
-        leftHeader.style.fontWeight = 'bold'; 
-        leftHeader.style.fontSize = '12px'; 
-        leftHeader.textContent = 'Task Name';
-        
-        const leftContent = document.createElement('div'); 
-        leftContent.style.flex = '1'; 
-        leftContent.style.overflow = 'hidden'; 
-        
+        // Create Header Row
+        const ganttHeader = document.createElement('div');
+        ganttHeader.className = 'gantt-header';
+        ganttHeader.style.display = 'flex';
+        ganttHeader.style.height = `${CONFIG.headerHeight}px`;
+        ganttHeader.style.borderBottom = '1px solid #999';
+        ganttHeader.style.background = '#f8f9fa';
+        ganttHeader.style.width = 'fit-content';
+        ganttHeader.style.minWidth = '100%';
+        ganttHeader.style.position = 'sticky';
+        ganttHeader.style.top = '0';
+        ganttHeader.style.zIndex = '3';
+
+        const ganttTaskList = document.createElement('div');
+        ganttTaskList.className = 'gantt-task-list';
+        ganttTaskList.style.width = '280px';
+        ganttTaskList.style.flexShrink = '0';
+        ganttTaskList.style.padding = '0 10px';
+        ganttTaskList.style.display = 'flex';
+        ganttTaskList.style.alignItems = 'center';
+        ganttTaskList.style.fontWeight = 'bold';
+        ganttTaskList.style.fontSize = '12px';
+        ganttTaskList.style.background = '#f8f9fa';
+        ganttTaskList.style.position = 'sticky';
+        ganttTaskList.style.left = '0';
+        ganttTaskList.style.zIndex = '4';
+        ganttTaskList.style.borderRight = '1px solid #ccc';
+        ganttTaskList.textContent = 'Task (duration)';
+        ganttHeader.appendChild(ganttTaskList);
+
+        const ganttTimelineHeader = document.createElement('div');
+        ganttTimelineHeader.className = 'gantt-timeline';
+        ganttTimelineHeader.style.flex = '1';
+        ganttHeader.appendChild(ganttTimelineHeader);
+
+        // Main Body Scroller
+        const bodyScroller = document.createElement('div');
+        bodyScroller.className = 'gantt-body-scroller';
+        bodyScroller.style.flex = '1';
+        bodyScroller.style.overflow = 'auto';
+        bodyScroller.style.display = 'flex';
+        bodyScroller.style.flexDirection = 'column';
+        rootContainer.appendChild(bodyScroller);
+        bodyScroller.appendChild(ganttHeader);
+
+        const ganttBody = document.createElement('div');
+        ganttBody.className = 'gantt-body';
+        ganttBody.style.width = 'fit-content';
+        ganttBody.style.minWidth = '100%';
+        ganttBody.style.position = 'relative';
+        bodyScroller.appendChild(ganttBody);
+
         const validTasks = scheduleData.filter(t => !isNaN(parseLocal(t.start).getTime()));
-        
-        validTasks.forEach((task, index) => {
-            const rowDiv = document.createElement('div'); 
-            rowDiv.style.height = `${CONFIG.rowHeight}px`; 
-            rowDiv.style.borderBottom = '1px solid #f0f0f0'; 
-            rowDiv.style.padding = '0 10px'; 
-            rowDiv.style.display = 'flex'; 
-            rowDiv.style.alignItems = 'center'; 
-            rowDiv.style.fontSize = CONFIG.taskFontSize; 
-            rowDiv.style.backgroundColor = index % 2 === 0 ? '#fff' : '#fafafa'; 
-            rowDiv.style.whiteSpace = 'nowrap'; 
-            rowDiv.style.overflow = 'hidden'; 
-            rowDiv.style.textOverflow = 'ellipsis';
-            rowDiv.style.cursor = 'pointer'; 
-            rowDiv.title = `Double-click to edit ${task.name}`; 
-            rowDiv.textContent = `${task.id}. ${task.name}`;
-            
-            // Double-click to Edit Start/Duration from Left Column
-            rowDiv.addEventListener('dblclick', () => {
-                const newStartStr = prompt(`Edit Start Date for "${task.name}" (YYYY-MM-DD):`, task.start);
-                if (!newStartStr) return;
-                
-                const newDurationStr = prompt(`Edit Duration for "${task.name}" (Days):`, task.duration);
-                if (!newDurationStr) return;
-                
-                const newDuration = parseInt(newDurationStr);
-                
-                if (!isNaN(newDuration) && newDuration > 0) {
-                     const start = parseLocal(newStartStr);
-                     if (isNaN(start.getTime())) {
-                         alert("Invalid Date"); return;
-                     }
-                     const newEnd = new Date(start);
-                     newEnd.setDate(newEnd.getDate() + newDuration - 1);
-                     
-                     if (typeof onUpdate === 'function') {
-                        onUpdate({ id: task.id, start: formatDateLocal(start), end: formatDateLocal(newEnd) });
-                    }
-                } else {
-                    alert("Invalid Duration");
-                }
-            });
-
-            leftContent.appendChild(rowDiv);
-        });
-        
-        taskListDiv.appendChild(leftHeader);
-        taskListDiv.appendChild(leftContent);
-        contentArea.appendChild(taskListDiv);
-
-        if (validTasks.length === 0) { 
-            contentArea.appendChild(document.createTextNode('No valid schedule data')); 
-            return; 
+        if (validTasks.length === 0) {
+            ganttBody.innerHTML = '<div style="padding:20px;">No valid schedule data</div>';
+            return;
         }
 
         // Timeline Setup
-        const taskStarts = validTasks.map(t => parseLocal(t.start)); 
+        const taskStarts = validTasks.map(t => parseLocal(t.start));
         const taskEnds = validTasks.map(t => parseLocal(t.end));
-        const minStart = new Date(Math.min.apply(null, taskStarts)); 
+        const minStart = new Date(Math.min.apply(null, taskStarts));
         const maxEnd = new Date(Math.max.apply(null, taskEnds));
-        
-        const threeYearsLater = new Date(minStart); 
-        threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
-        
-        const ganttStartDate = new Date(minStart); 
+        const ganttStartDate = new Date(minStart);
         ganttStartDate.setDate(ganttStartDate.getDate() - 7);
-        
-        let ganttEndDate = new Date(Math.max(maxEnd.getTime(), threeYearsLater.getTime())); 
+        const threeYearsLater = new Date(minStart);
+        threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
+        let ganttEndDate = new Date(Math.max(maxEnd.getTime(), threeYearsLater.getTime()));
         ganttEndDate.setDate(ganttEndDate.getDate() + 30);
 
         const totalDays = Math.ceil((ganttEndDate - ganttStartDate) / (1000 * 60 * 60 * 24));
         const dayWidth = CONFIG.zoomLevels[CONFIG.currentZoom].dayWidth;
-        //const chartWidth = Math.ceil(totalDays * dayWidth); 
+        const chartWidth = Math.ceil(totalDays * dayWidth);
         const bodyHeight = validTasks.length * CONFIG.rowHeight;
 
-        // RIGHT CONTAINER (Timeline)
-        const timelineContainer = document.createElement('div'); 
-        timelineContainer.style.flex = '1'; 
-        timelineContainer.style.display = 'flex'; 
-        timelineContainer.style.flexDirection = 'column'; 
-        timelineContainer.style.overflow = 'hidden';
-        contentArea.appendChild(timelineContainer);
- // MODIFICATION: Calculate dynamic chart width
-        const availableTimelineWidth = timelineContainer.clientWidth;
-        const calculatedChartWidth = Math.ceil(totalDays * dayWidth);
-        const chartWidth = Math.max(calculatedChartWidth, availableTimelineWidth);
-//end modification
-        const headerScrollArea = document.createElement('div'); 
-        headerScrollArea.style.height = `${CONFIG.headerHeight}px`; 
-        headerScrollArea.style.overflow = 'hidden'; 
-        headerScrollArea.style.backgroundColor = '#f8f9fa';
-        timelineContainer.appendChild(headerScrollArea);
-        
+        // Draw Header labels SVG
         const headerSvg = createSvgElement('svg', { width: chartWidth, height: CONFIG.headerHeight, style: 'display:block;' });
-        drawHeader(headerSvg, ganttStartDate, totalDays); 
-        headerScrollArea.appendChild(headerSvg);
+        drawHeader(headerSvg, ganttStartDate, totalDays);
+        ganttTimelineHeader.appendChild(headerSvg);
 
-        const bodyScrollArea = document.createElement('div'); 
-        bodyScrollArea.style.flex = '1'; 
-        bodyScrollArea.style.overflow = 'auto'; 
-        timelineContainer.appendChild(bodyScrollArea);
-        
-        const bodySvg = createSvgElement('svg', { width: chartWidth, height: bodyHeight, style: 'display:block;' });
-        // NOTE: Internal <style> tag removed for html2canvas compatibility
-        
+        // Single shared SVG for all bars and lines
+        const bodySvg = createSvgElement('svg', { width: chartWidth, height: bodyHeight, style: 'display:block; position:absolute; left:280px; top:0; z-index:1;' });
         drawGrid(bodySvg, ganttStartDate, totalDays, bodyHeight);
         drawTimelineBars(bodySvg, validTasks, ganttStartDate, totalDays, onUpdate);
-        bodyScrollArea.appendChild(bodySvg);
+        ganttBody.appendChild(bodySvg);
 
-        // Sync Scrolling
-        bodyScrollArea.addEventListener('scroll', () => { 
-            headerScrollArea.scrollLeft = bodyScrollArea.scrollLeft; 
-            leftContent.scrollTop = bodyScrollArea.scrollTop; 
+        // Create Task Rows (Overlay)
+        validTasks.forEach((task, index) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'task-row';
+            rowDiv.style.display = 'flex';
+            rowDiv.style.height = `${CONFIG.rowHeight}px`;
+            rowDiv.style.borderBottom = '1px solid #f0f0f0';
+            rowDiv.style.position = 'relative';
+            rowDiv.style.zIndex = '2'; // Sit over the SVG background but under bars? No, SVG will move.
+
+            const taskInfo = document.createElement('div');
+            taskInfo.className = 'task-info';
+            taskInfo.style.width = '280px';
+            taskInfo.style.flexShrink = '0';
+            taskInfo.style.padding = '0 10px';
+            taskInfo.style.display = 'flex';
+            taskInfo.style.alignItems = 'center';
+            taskInfo.style.fontSize = CONFIG.taskFontSize;
+            // Apply zebra stripes to taskInfo only
+            taskInfo.style.background = index % 2 === 0 ? '#fff' : '#fafafa';
+            taskInfo.style.position = 'sticky';
+            taskInfo.style.left = '0';
+            taskInfo.style.zIndex = '5';
+            taskInfo.style.borderRight = '1px solid #ccc';
+            taskInfo.style.whiteSpace = 'nowrap';
+            taskInfo.style.overflow = 'hidden';
+            taskInfo.style.textOverflow = 'ellipsis';
+            taskInfo.textContent = `${task.id}. ${task.name}`;
+            taskInfo.style.cursor = 'pointer';
+
+            // Interaction
+            taskInfo.addEventListener('dblclick', () => {
+                const newStartStr = prompt(`Edit Start Date for "${task.name}" (YYYY-MM-DD):`, task.start);
+                if (!newStartStr) return;
+                const newDurationStr = prompt(`Edit Duration for "${task.name}" (Days):`, task.duration);
+                if (!newDurationStr) return;
+                const newDuration = parseInt(newDurationStr);
+                if (!isNaN(newDuration) && newDuration > 0) {
+                    const start = parseLocal(newStartStr);
+                    const newEnd = new Date(start);
+                    newEnd.setDate(newEnd.getDate() + newDuration - 1);
+                    if (typeof onUpdate === 'function') onUpdate({ id: task.id, start: formatDateLocal(start), end: formatDateLocal(newEnd) });
+                }
+            });
+
+            const timelineArea = document.createElement('div');
+            timelineArea.className = 'timeline-area';
+            timelineArea.style.width = `${chartWidth}px`;
+            timelineArea.style.flexShrink = '0';
+            timelineArea.style.pointerEvents = 'none'; // Allow clicks through to SVG bars
+
+            rowDiv.appendChild(taskInfo);
+            rowDiv.appendChild(timelineArea);
+            ganttBody.appendChild(rowDiv);
         });
     };
 

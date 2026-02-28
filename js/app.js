@@ -331,6 +331,35 @@ document.addEventListener('DOMContentLoaded', () => {
             return expiry >= now && expiry <= thirtyDaysFromNow;
         });
         App.DOMElements['expiring-documents-count'].textContent = expiringDocs.length;
+
+        // MODIFICATION START: Calculate Monthly financial trackers
+        const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+        let monthlyIncome = 0;
+        projects.forEach(p => {
+            (p.invoices || []).forEach(inv => {
+                if (inv.status === 'Paid' && inv.paymentDetails && inv.paymentDetails.date.substring(0, 7) === currentMonth) {
+                    monthlyIncome += parseFloat(inv.paymentDetails.amountPaid || inv.total || 0);
+                }
+            });
+        });
+
+        const staffList = await DB.getAllHRData();
+        const officeExpenses = await DB.getOfficeExpenses();
+
+        const monthlyStaffSalaries = staffList.reduce((sum, s) => sum + (parseFloat(s.grossSalary) || 0), 0);
+        const annualOfficeExpenses = officeExpenses.filter(e => e.frequency === 'annual').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+        const proratedMonthlyOfficeExpenses = annualOfficeExpenses / 12;
+
+        // Add monthly fixed expenses (if any are marked monthly)
+        const directMonthlyExpenses = officeExpenses.filter(e => e.frequency === 'monthly').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+        const totalMonthlyExpense = monthlyStaffSalaries + proratedMonthlyOfficeExpenses + directMonthlyExpenses;
+        const monthlyBalance = monthlyIncome - totalMonthlyExpense;
+
+        if (App.DOMElements['monthly-expense-total']) App.DOMElements['monthly-expense-total'].textContent = App.formatCurrency(totalMonthlyExpense);
+        if (App.DOMElements['monthly-income-total']) App.DOMElements['monthly-income-total'].textContent = App.formatCurrency(monthlyIncome);
+        if (App.DOMElements['monthly-balance-total']) App.DOMElements['monthly-balance-total'].textContent = App.formatCurrency(monthlyBalance);
+        // MODIFICATION END
     }
 
     async function showPendingInvoicesModal() {
@@ -895,6 +924,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const renderFunc = renderMap[tabId];
         if (renderFunc) {
+            // Auto-switch page size for schedule
+            if (tabId === 'villa-schedule') {
+                const selector = document.getElementById('page-size-selector');
+                if (selector) selector.value = 'A3_landscape';
+            }
+
             const content = await renderFunc();
             if (content !== undefined) {
                 const previewEl = App.DOMElements[`${tabId}-preview`];
@@ -1116,7 +1151,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'payment-cheque-bank', 'save-payment-btn',
             'project-report-preview', 'toggle-report-options-btn', 'report-options-container', 'generate-report-preview-btn',
             'generate-all-projects-report-btn', 'all-projects-report-modal', 'all-projects-report-modal-close-btn', 'all-projects-report-project-list',
-            'all-projects-report-select-all-btn', 'generate-multi-report-btn', 'all-projects-report-preview-container', 'download-multi-report-pdf-btn'
+            'all-projects-report-select-all-btn', 'generate-multi-report-btn', 'all-projects-report-preview-container', 'download-multi-report-pdf-btn',
+            'monthly-expense-total', 'monthly-income-total', 'monthly-balance-total'
         ];
         ids.forEach(id => {
             const el = document.getElementById(id);

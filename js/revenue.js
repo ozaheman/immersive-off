@@ -22,7 +22,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function cacheDOMElements() {
         const ids = [
             'revenueForecastChart', 'profitExpensePieChart', 'resourceAllocationPieChart',
-            'profitDistributionPieChart', 'staff-salary-body', 'monthly-expense-body', 'staff-loan-body'
+            'profitDistributionPieChart', 'staff-salary-body', 'monthly-expense-body', 'staff-loan-body',
+            'yearlyPlanChart'
         ];
         ids.forEach(id => DOMElements[id] = document.getElementById(id));
     }
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderProfitExpenseChart();
         renderResourceAllocationChart();
         renderProfitDistributionChart();
+        renderYearlyPlanChart();
     }
 
     // --- Financial Tables ---
@@ -73,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const proratedRow = expenseBody.insertRow();
         proratedRow.className = 'total-row';
         proratedRow.innerHTML = `<td><b>Avg. Monthly Cost (Prorated)</b></td><td style="text-align:right;"><b>${formatCurrency(proratedMonthly)}</b></td>`;
-        
+
         // Staff Loans
         const loanBody = DOMElements['staff-loan-body'];
         loanBody.innerHTML = '';
@@ -141,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const ctx = DOMElements.profitExpensePieChart.getContext('2d');
         const totalAnnualSalary = staffList.reduce((sum, s) => sum + (s.grossSalary * 12), 0);
         const totalAnnualOfficeExpense = officeExpenses.filter(e => e.frequency === 'annual').reduce((sum, e) => sum + e.amount, 0);
-        
+
         let totalRevenueLast12Months = 0;
         const aYearAgo = new Date();
         aYearAgo.setFullYear(aYearAgo.getFullYear() - 1);
@@ -166,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     backgroundColor: ['#1cc88a', '#e74a3b', '#f6c23e'],
                 }]
             },
-             options: { responsive: true, maintainAspectRatio: false }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
@@ -192,25 +194,150 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderProfitDistributionChart() {
-         const ctx = DOMElements.profitDistributionPieChart.getContext('2d');
-         // Placeholder for a more complex model
-         const distribution = {
-             'Re-investment': 40,
-             'Partner A': 25,
-             'Partner B': 25,
-             'Bonuses': 10
-         };
-         new Chart(ctx, {
-             type: 'pie',
-             data: {
-                 labels: Object.keys(distribution),
-                 datasets: [{
-                     data: Object.values(distribution),
-                     backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e'],
-                 }]
-             },
-             options: { responsive: true, maintainAspectRatio: false }
-         });
+        const ctx = DOMElements.profitDistributionPieChart.getContext('2d');
+        // Placeholder for a more complex model
+        const distribution = {
+            'Re-investment': 40,
+            'Partner A': 25,
+            'Partner B': 25,
+            'Bonuses': 10
+        };
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(distribution),
+                datasets: [{
+                    data: Object.values(distribution),
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e'],
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+
+    function renderYearlyPlanChart() {
+        if (!DOMElements.yearlyPlanChart) return;
+        const ctx = DOMElements.yearlyPlanChart.getContext('2d');
+
+        // Generate months for the current year
+        const currentYear = new Date().getFullYear();
+        const months = [];
+        for (let i = 0; i < 12; i++) {
+            months.push(`${currentYear}-${String(i + 1).padStart(2, '0')}`);
+        }
+
+        // 1. Calculate Expenses (Fixed per month)
+        const monthlyStaffSalaries = staffList.reduce((sum, s) => sum + (parseFloat(s.grossSalary) || 0), 0);
+        const annualOfficeExpenses = officeExpenses.filter(e => e.frequency === 'annual').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+        const monthlyOfficeExpenses = (annualOfficeExpenses / 12) + officeExpenses.filter(e => e.frequency === 'monthly').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+        const totalMonthlyExpense = monthlyStaffSalaries + monthlyOfficeExpenses;
+
+        const combinedRevenueData = months.map(month => {
+            return allProjects.reduce((sum, p) => {
+                const projectRevenue = (p.invoices || []).filter(inv =>
+                    (inv.status === 'Paid' || inv.status === 'Raised' || inv.status === 'Pending') &&
+                    inv.date && inv.date.substring(0, 7) === month
+                ).reduce((s, inv) => s + parseFloat(inv.amount || inv.total || 0), 0);
+                return sum + projectRevenue;
+            }, 0);
+        });
+
+        // 3. Prepare individual project revenue lines (Top 5 projects by fee)
+        const topProjects = [...allProjects].sort((a, b) => {
+            const getFee = (p) => p.remunerationType === 'lumpSum' ? (parseFloat(p.lumpSumFee) || 0) : ((parseFloat(p.builtUpArea) || 0) * (parseFloat(p.constructionCostRate) || 0) * (parseFloat(p.consultancyFeePercentage) || 0) / 100);
+            return getFee(b) - getFee(a);
+        }).slice(0, 5);
+
+        const projectDatasets = topProjects.map((p, idx) => {
+            const colors = ['#4e73df', '#f6c23e', '#36b9cc', '#858796', '#5a5c69'];
+            return {
+                label: `Proj: ${p.jobNo}`,
+                data: months.map(month => {
+                    return (p.invoices || []).filter(inv =>
+                        inv.date && inv.date.substring(0, 7) === month
+                    ).reduce((s, inv) => s + parseFloat(inv.amount || inv.total || 0), 0);
+                }),
+                borderColor: colors[idx % colors.length],
+                borderWidth: 1.5,
+                fill: false,
+                tension: 0.3,
+                borderDash: [5, 5],
+                pointRadius: 2,
+                order: 3
+            };
+        });
+
+        const staffSalaryData = months.map(() => monthlyStaffSalaries);
+        const officeExpenseData = months.map(() => monthlyOfficeExpenses);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(m => {
+                    const [year, month] = m.split('-');
+                    return new Date(year, month - 1).toLocaleString('default', { month: 'short' });
+                }),
+                datasets: [
+                    {
+                        label: 'Staff Salaries (Fixed)',
+                        data: staffSalaryData,
+                        backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                        borderColor: '#4e73df',
+                        borderWidth: 1,
+                        fill: true,
+                        pointRadius: 0,
+                        order: 10,
+                        stack: 'expenses'
+                    },
+                    {
+                        label: 'Office Expenses (Prorated)',
+                        data: officeExpenseData,
+                        backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                        borderColor: '#e74a3b',
+                        borderWidth: 1,
+                        fill: true,
+                        pointRadius: 0,
+                        order: 9,
+                        stack: 'expenses'
+                    },
+                    {
+                        label: 'Total Revenue Forecast',
+                        data: combinedRevenueData,
+                        backgroundColor: 'rgba(28, 200, 138, 0.2)',
+                        borderColor: '#1cc88a',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        order: 1
+                    },
+                    ...projectDatasets
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        stacked: false, // Don't stack revenue and expenses together
+                        title: { display: true, text: 'Amount (AED)' }
+                    },
+                    x: {
+                        stacked: true // Stack the expense areas
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.dataset.label + ': ' + formatCurrency(context.raw);
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
 

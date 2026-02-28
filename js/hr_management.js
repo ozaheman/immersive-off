@@ -103,8 +103,8 @@ function cacheDOMElements() {
         'annual-expense-item', 'annual-expense-amount', 'annual-expense-due-date', 'add-annual-expense-btn', 'annual-expense-body',
         'efficiency-report-body',
         // MODIFICATION: New element IDs
-        'vat-report-body', 'ref-name', 'ref-contact', 'ref-phone', 'ref-email', 'ref-notes', 'add-referral-btn', 'referral-accounts-body',
-        'other-name', 'other-contact', 'other-phone', 'other-email', 'other-notes', 'add-other-account-btn', 'other-accounts-body',
+        'vat-report-body', 'ref-name', 'ref-contact', 'ref-phone', 'ref-email', 'ref-notes', 'ref-project-no', 'add-referral-btn', 'referral-accounts-body',
+        'other-name', 'other-contact', 'other-phone', 'other-email', 'other-notes', 'other-project-no', 'add-other-account-btn', 'other-accounts-body',
         // MODIFICATION: Add app-container to the main list
         'app-container',
         // MODIFICATION: Cache new Payroll elements
@@ -120,7 +120,8 @@ function cacheDOMElements() {
         'download-letter-pdf-v2-btn', 'mark-as-sent-btn', 'send-whatsapp-btn', 'send-email-btn', 'send-outlook-btn',
         'info-letter-type', 'info-letter-template', 'info-letter-status', 'info-word-count', 'drafts-list-body',
         'sent-list-body', 'templates-catalog', 'letter-type-select', 'letter-template-select', 'load-template-btn', 'letter-preview-modal',
-        'close-letter-preview-btn', 'letter-management-preview-area', 'download-preview-pdf-btn'
+        'close-letter-preview-btn', 'letter-management-preview-area', 'download-preview-pdf-btn',
+        'project-invoice-project-select', 'project-invoices-summary-body'
     ];
 
     DOMElements.letterRecipientName = document.getElementById('letter-recipient-name');
@@ -222,6 +223,7 @@ function setupEventListeners() {
             document.getElementById('inv-sort-by').value = 'date-desc';
             renderInvoicesTab();
         });
+        DOMElements.projectInvoiceProjectSelect?.addEventListener('change', renderProjectInvoicesTab);
     }
 }
 // MODIFICATION START: Universal Search Handler
@@ -303,6 +305,10 @@ function handleTabSwitch(e) {
         renderVatReport();
     } else if (tabId === 'invoices') {
         renderInvoicesTab();
+    } else if (tabId === 'project-invoices') {
+        renderProjectInvoicesTab();
+    } else if (tabId === 'ledger') {
+        if (typeof LedgerManager !== 'undefined') LedgerManager.render();
     }
 }
 function populateSelects() {
@@ -321,6 +327,13 @@ function populateSelects() {
             projectList.sort((a, b) => a.jobNo.localeCompare(b.jobNo)).forEach(proj => select.add(new Option(`${proj.jobNo} - ${proj.projectDescription}`, proj.jobNo)));
         }
     });
+    if (DOMElements.projectInvoiceProjectSelect) {
+        const select = DOMElements.projectInvoiceProjectSelect;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">-- All Projects --</option>';
+        projectList.forEach(proj => select.add(new Option(`${proj.jobNo} - ${proj.clientName}`, proj.jobNo)));
+        if (currentValue) select.value = currentValue;
+    }
 }
 
 function renderStaffList() {
@@ -1854,4 +1867,41 @@ function renderInvoicesTab() {
     document.getElementById('inv-total-referral').textContent = formatCurrency(totalReferralFee);
     document.getElementById('inv-total-vat').textContent = formatCurrency(totalVat);
     document.getElementById('inv-total-outstanding').textContent = formatCurrency(totalOutstanding);
+}
+async function renderProjectInvoicesTab() {
+    if (!DOMElements.projectInvoicesSummaryBody) return;
+
+    const selectedJobNo = DOMElements.projectInvoiceProjectSelect?.value;
+    const filteredProjects = selectedJobNo ? projectList.filter(p => p.jobNo === selectedJobNo) : projectList;
+
+    DOMElements.projectInvoicesSummaryBody.innerHTML = '';
+
+    filteredProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo)).forEach(p => {
+        // Calculate Total Amount using the same logic as Fees tab
+        let totalAmount = 0;
+        if (p.remunerationType === 'lumpSum') {
+            totalAmount = parseFloat(p.lumpSumFee) || 0;
+        } else {
+            const area = parseFloat(p.builtUpArea) || 0;
+            const rate = parseFloat(p.constructionCostRate) || 0;
+            const feePercent = parseFloat(p.consultancyFeePercentage) || 0;
+            totalAmount = (area * rate * feePercent) / 100;
+        }
+
+        const totalPaid = (p.invoices || []).reduce((sum, inv) => {
+            if (inv.status === 'Paid') return sum + (parseFloat(inv.paymentDetails?.amountPaid || inv.total) || 0);
+            return sum;
+        }, 0);
+        const balance = totalAmount - totalPaid;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.jobNo}</td>
+            <td>${p.clientName}</td>
+            <td style="text-align:right;">${formatCurrency(totalAmount)}</td>
+            <td style="text-align:right;">${formatCurrency(totalPaid)}</td>
+            <td style="text-align:right; font-weight: bold; color: ${balance > 0 ? '#e74a3b' : '#1cc88a'};">${formatCurrency(balance)}</td>
+        `;
+        DOMElements.projectInvoicesSummaryBody.appendChild(tr);
+    });
 }

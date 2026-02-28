@@ -718,9 +718,15 @@ const YEARLY_FIXED_EXPENSES = [
 const textureLoader = new THREE.TextureLoader();
 function loadPBR(path) {
     const maps = {};
-    const catchError = () => { };
+    const catchError = (err) => {
+        // Silently handle 404s for textures
+        // console.log("Texture missing at", path);
+    };
 
-    maps.map = textureLoader.load(`${path}/albedo.jpg`, undefined, undefined, catchError);
+    // If albedo is missing in certain directories (like granite), use roughness or a placeholder
+    const albedoPath = path.includes('granite') ? `${path}/roughness.jpg` : `${path}/albedo.jpg`;
+
+    maps.map = textureLoader.load(albedoPath, undefined, undefined, catchError);
     maps.normalMap = textureLoader.load(`${path}/normal.jpg`, undefined, undefined, catchError);
     maps.roughnessMap = textureLoader.load(`${path}/roughness.jpg`, undefined, undefined, catchError);
     maps.metalnessMap = textureLoader.load(`${path}/metalness.jpg`, undefined, undefined, catchError);
