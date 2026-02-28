@@ -6,6 +6,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Immersive - Unified Management Dashboard</title>
+    <!-- Prevent favicon.ico 404 -->
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="css/style.css">
     <!-- MODIFICATION START: Added print-specific stylesheet -->
     <link rel="stylesheet" href="css/print.css" media="print">
@@ -704,6 +706,20 @@
                         <div class="label">Expiring Documents</div>
                         <div id="expiring-documents-count" class="value">0</div>
                     </div>
+                    <!-- MODIFICATION START: New Financial Trackers -->
+                    <div class="summary-item" style="border-left: 3px solid #e74a3b;">
+                        <div class="label">Monthly Expense</div>
+                        <div id="monthly-expense-total" class="value">0</div>
+                    </div>
+                    <div class="summary-item" style="border-left: 3px solid #1cc88a;">
+                        <div class="label">Monthly Income</div>
+                        <div id="monthly-income-total" class="value">0</div>
+                    </div>
+                    <div class="summary-item" style="border-left: 3px solid #4e73df; background-color: #f8f9fc;">
+                        <div class="label">Monthly Balance</div>
+                        <div id="monthly-balance-total" class="value" style="font-weight: 900;">0</div>
+                    </div>
+                    <!-- MODIFICATION END -->
                 </div>
                 <div class="dashboard-header-controls">
                     <button id="design-studio-btn" class="secondary-button">Design Center</button>
@@ -820,8 +836,9 @@
                                 Data</button>
                             <hr>
                             <h4>BOQ Verification (Read-Only)</h4>
-                            <h1 class="font-bold text-xl m-0">Immersive</h1> table shows the latest finalized BOQ from the site. Rows with new
-                                progress are highlighted.</p>
+                            <h1 class="font-bold text-xl m-0">Immersive</h1> table shows the latest finalized BOQ from
+                            the site. Rows with new
+                            progress are highlighted.</p>
                             <div class="table-container"
                                 style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
                                 <table class="output-table">

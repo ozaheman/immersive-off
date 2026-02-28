@@ -1,5 +1,4 @@
-
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -57,16 +56,18 @@
             border-bottom: 2px solid #ccc;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            gap: 0;
         }
 
         .tab-button {
             background: none;
             border: none;
-            padding: 10px 20px;
+            padding: 7px 10px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.82em;
             color: #555;
             border-bottom: 3px solid transparent;
+            white-space: nowrap;
         }
 
         .tab-button.active {
@@ -177,6 +178,105 @@
         }
 
         /* MODIFICATION END */
+
+        /* ── LEDGER TAB ── */
+        .ledger-wrap {
+            padding: 0;
+        }
+
+        .ledger-summary-cards {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .ledger-card {
+            flex: 1;
+            min-width: 160px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            color: #fff;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+        }
+
+        .ledger-card-label {
+            font-size: 0.78em;
+            opacity: 0.85;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ledger-card-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .ledger-card-debit {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .ledger-card-credit {
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+        }
+
+        .ledger-card-net-pos {
+            background: linear-gradient(135deg, #2980b9, #1a5276);
+        }
+
+        .ledger-card-net-neg {
+            background: linear-gradient(135deg, #e67e22, #ca6f1e);
+        }
+
+        .ledger-card-entries {
+            background: linear-gradient(135deg, #8e44ad, #6c3483);
+        }
+
+        .ledger-entry-form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .ledger-entry-form .input-group {
+            flex: 1;
+            min-width: 130px;
+            margin: 0;
+        }
+
+        .ledger-entry-form .input-group input,
+        .ledger-entry-form .input-group select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.88em;
+        }
+
+        .ledger-filters .input-group {
+            margin: 0;
+        }
+
+        .account-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #e8f0fe;
+            color: #1a73e8;
+            font-size: 0.8em;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .balance-positive {
+            color: #1e8449 !important;
+        }
+
+        .balance-negative {
+            color: #c0392b !important;
+        }
     </style>
 </head>
 
@@ -196,31 +296,25 @@
         </header>
 
         <div class="tabs" id="tabs">
-            <button class="tab-button" data-tab="staff-list">Staff List & Salaries</button>
+            <button class="tab-button" data-tab="staff-list">Staff List &amp; Salaries</button>
             <button class="tab-button" data-tab="reminders">Reminders</button>
             <button class="tab-button" data-tab="offer-letters">Offer Letters</button>
             <button class="tab-button" data-tab="leave-management">Annual Leaves</button>
             <button class="tab-button" data-tab="expense-log">Office Expense Log</button>
             <button class="tab-button" data-tab="payroll">Payroll Tools</button>
             <button class="tab-button" data-tab="letter-management">Letter Management</button>
-            <!-- Removed duplicate letter-generation tab button -->
-            <!-- MODIFICATION: Add Efficiency Report tab -->
             <button class="tab-button" data-tab="vat-report">VAT Report</button>
-            <!-- MODIFICATION END -->
             <button class="tab-button" data-tab="annual-expenses">Annual Expenses</button>
             <button class="tab-button" data-tab="increments">Staff Increments</button>
-
             <button class="tab-button" data-tab="efficiency">Efficiency Report</button>
-            <!-- MODIFICATION START: New Tabs -->
             <button class="tab-button" data-tab="referral-accounts">Referral Accounts</button>
             <button class="tab-button" data-tab="other-accounts">Other Accounts</button>
-            <!-- MODIFICATION START: New Tabs -->
             <button class="tab-button" data-tab="asset-tracker">Asset Tracker</button>
             <button class="tab-button" data-tab="tools">Tools</button>
-            <button class="tab-button active" data-tab="invoices">Invoices</button>
-            <!-- MODIFICATION END -->
+            <button class="tab-button" data-tab="invoices">Invoices</button>
+            <button class="tab-button" data-tab="project-invoices">Project Invoices</button>
+            <button class="tab-button" data-tab="ledger">Ledger</button>
         </div>
-
         <!-- Tab 1: Staff List -->
         <div id="staff-list-tab" class="tab-content">
             <div class="tool-card" id="staff-list-card">
@@ -232,12 +326,16 @@
                     <!-- MODIFICATION START: Search Bar -->
                     <input type="search" class="table-search-input" data-table-selector="#staff-table"
                         placeholder="Search staff...">
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <button class="secondary-button export-csv-btn" data-table-id="staff-table"
                         data-filename="Staff_List">Export as CSV</button>
                     <button class="secondary-button print-pdf-btn" data-element-id="staff-list-card"
                         data-filename="Staff_List">Print as PDF</button>
                 </div>
+        
+        <!-- Ledger Tab -->
                 <!-- MODIFICATION END -->
                 <div class="table-container">
                     <table class="output-table" id="staff-table">
@@ -695,7 +793,9 @@
                         <button class="secondary-button print-pdf-btn" data-element-id="leave-history-card"
                             data-filename="Leave_History">Print as PDF</button>
                     </div>
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <div class="table-container">
                         <table class="output-table" id="leave-table">
                             <thead>
@@ -764,7 +864,9 @@
                         <button class="secondary-button print-pdf-btn" data-element-id="expense-history-card"
                             data-filename="Office_Expenses">Print as PDF</button>
                     </div>
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <div class="table-container" style="margin-top: 15px;">
                         <table class="output-table" id="expense-table">
                             <thead>
@@ -851,7 +953,9 @@
                         <button class="secondary-button print-pdf-btn" data-element-id="increment-history-card"
                             data-filename="Increment_History">Print as PDF</button>
                     </div>
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <div class="table-container">
                         <table class="output-table" id="increment-table">
                             <thead>
@@ -885,6 +989,8 @@
                     <button class="secondary-button print-pdf-btn" data-element-id="efficiency-report-card"
                         data-filename="Efficiency_Report">Print as PDF</button>
                 </div>
+        
+        <!-- Ledger Tab -->
                 <!-- MODIFICATION END -->
                 <div class="table-container">
                     <table class="output-table" id="efficiency-table">
@@ -953,7 +1059,9 @@
                     <!-- MODIFICATION START -->
                     <div class="input-group"><label for="ref-project-no">Associated Project</label><select
                             id="ref-project-no"></select></div>
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <div class="input-group"><label for="ref-notes">Notes</label><textarea id="ref-notes"
                             rows="3"></textarea></div>
                     <button id="add-referral-btn" class="primary-button">Add Referral</button>
@@ -1007,7 +1115,9 @@
                     <!-- MODIFICATION START -->
                     <div class="input-group"><label for="other-project-no">Associated Project</label><select
                             id="other-project-no"></select></div>
-                    <!-- MODIFICATION END -->
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
                     <div class="input-group"><label for="other-notes">Notes</label><textarea id="other-notes"
                             rows="3"></textarea></div>
                     <button id="add-other-account-btn" class="primary-button">Add Account</button>
@@ -1118,108 +1228,317 @@
                 </div>
             </div>
         </div>
-        <!-- MODIFICATION END -->
-   
 
-    <!-- Tab: Invoices -->
-    <div id="invoices-tab" class="tab-content active">
-        <div class="hr-layout" style="grid-template-columns: 1fr 2.5fr;">
-            <!-- Left Panel: Filters -->
-            <div class="form-card">
-                <h3>Filter Invoices</h3>
-                <div class="input-group">
-                    <label>Search</label>
-                    <input type="text" id="inv-search" placeholder="Client, Project, Code...">
-                </div>
-                <div class="input-group">
-                    <label>Sort By</label>
-                    <select id="inv-sort-by">
-                        <option value="date-desc">Date (Newest First)</option>
-                        <option value="date-asc">Date (Oldest First)</option>
-                        <option value="amount-desc">Amount (High to Low)</option>
-                        <option value="amount-asc">Amount (Low to High)</option>
-                        <option value="client">Client Name</option>
-                        <option value="project">Project Name</option>
-                        <option value="location">Location</option>
-                    </select>
-                </div>
-                <!-- MODIFICATION START: Date Range Filters -->
-                <div class="input-group">
-                    <label for="inv-date-start">Date From</label>
-                    <input type="date" id="inv-date-start">
-                </div>
-                <div class="input-group">
-                    <label for="inv-date-end">Date To</label>
-                    <input type="date" id="inv-date-end">
-                </div>
+        <!-- Ledger Tab -->
                 <!-- MODIFICATION END -->
-                <div class="input-group">
-                    <label>Project Type</label>
-                    <select id="inv-filter-type">
-                        <option value="">All Types</option>
-                        <option value="Residential">Residential</option>
-                        <option value="Commercial">Commercial</option>
-                        <option value="Industrial">Industrial</option>
-                        <option value="Interior">Interior</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>Min Amount</label>
-                    <input type="number" id="inv-min-amount" placeholder="0">
-                </div>
-                <div class="input-group">
-                    <label>Max Amount</label>
-                    <input type="number" id="inv-max-amount" placeholder="Any">
-                </div>
-                <div class="input-group">
-                    <label>Fee Percentage</label>
-                    <input type="number" id="inv-fee-percent" placeholder="Minimum %">
-                </div>
-                <div class="input-group">
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" id="inv-filter-referral"> Has Referral Fee</label>
+
+
+        <!-- Tab: Invoices -->
+        <div id="invoices-tab" class="tab-content active">
+            <div class="hr-layout" style="grid-template-columns: 1fr 2.5fr;">
+                <!-- Left Panel: Filters -->
+                <div class="form-card">
+                    <h3>Filter Invoices</h3>
+                    <div class="input-group">
+                        <label>Search</label>
+                        <input type="text" id="inv-search" placeholder="Client, Project, Code...">
                     </div>
-                </div>
-                <button id="inv-reset-btn" class="secondary-button" style="width: 100%;">Reset Filters</button>
-            </div>
-            <!-- Right Panel: Table -->
-            <div class="tool-card">
-                <h3>All Raised Invoices</h3>
-                <div class="table-container">
-                    <table class="output-table" id="invoices-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Invoice No</th>
-                                <th>Project</th>
-                                <th>Client</th>
-                                <th>Type</th>
-                                <th>Location</th>
-                                <th style="text-align:right;">Amount (AED)</th>
-                                <th style="text-align:right;">Received</th>
-                                <th style="text-align:center;">Fee %</th>
-                                <th>Referral</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="invoices-list-body"></tbody>
-                    </table>
-                </div>
-                <!-- MODIFICATION START: Enhanced Totals Section -->
-                <div style="margin-top:15px; border-top: 1px solid #eee; padding-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><strong>Total Invoiced:</strong> <span id="inv-total-amount">AED 0.00</span></div>
-                    <div><strong>Total Received:</strong> <span id="inv-total-received">AED 0.00</span></div>
-                    <div><strong>Total Referral Fee:</strong> <span id="inv-total-referral">AED 0.00</span></div>
-                    <div><strong>Output VAT (5%):</strong> <span id="inv-total-vat">AED 0.00</span></div>
-                    <div style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; font-weight: bold; font-size: 1.1em;">
-                        <strong>Amount Outstanding:</strong> <span id="inv-total-outstanding">AED 0.00</span>
+                    <div class="input-group">
+                        <label>Sort By</label>
+                        <select id="inv-sort-by">
+                            <option value="date-desc">Date (Newest First)</option>
+                            <option value="date-asc">Date (Oldest First)</option>
+                            <option value="amount-desc">Amount (High to Low)</option>
+                            <option value="amount-asc">Amount (Low to High)</option>
+                            <option value="client">Client Name</option>
+                            <option value="project">Project Name</option>
+                            <option value="location">Location</option>
+                        </select>
                     </div>
-                </div>
+                    <!-- MODIFICATION START: Date Range Filters -->
+                    <div class="input-group">
+                        <label for="inv-date-start">Date From</label>
+                        <input type="date" id="inv-date-start">
+                    </div>
+                    <div class="input-group">
+                        <label for="inv-date-end">Date To</label>
+                        <input type="date" id="inv-date-end">
+                    </div>
+            
+        <!-- Ledger Tab -->
                 <!-- MODIFICATION END -->
+                    <div class="input-group">
+                        <label>Project Type</label>
+                        <select id="inv-filter-type">
+                            <option value="">All Types</option>
+                            <option value="Residential">Residential</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Industrial">Industrial</option>
+                            <option value="Interior">Interior</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Min Amount</label>
+                        <input type="number" id="inv-min-amount" placeholder="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Max Amount</label>
+                        <input type="number" id="inv-max-amount" placeholder="Any">
+                    </div>
+                    <div class="input-group">
+                        <label>Fee Percentage</label>
+                        <input type="number" id="inv-fee-percent" placeholder="Minimum %">
+                    </div>
+                    <div class="input-group">
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" id="inv-filter-referral"> Has Referral Fee</label>
+                        </div>
+                    </div>
+                    <button id="inv-reset-btn" class="secondary-button" style="width: 100%;">Reset Filters</button>
+                </div>
+                <!-- Right Panel: Table -->
+                <div class="tool-card">
+                    <h3>All Raised Invoices</h3>
+                    <div class="table-container">
+                        <table class="output-table" id="invoices-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Invoice No</th>
+                                    <th>Project</th>
+                                    <th>Client</th>
+                                    <th>Type</th>
+                                    <th>Location</th>
+                                    <th style="text-align:right;">Amount (AED)</th>
+                                    <th style="text-align:right;">Received</th>
+                                    <th style="text-align:center;">Fee %</th>
+                                    <th>Referral</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoices-list-body"></tbody>
+                        </table>
+                    </div>
+                    <!-- MODIFICATION START: Enhanced Totals Section -->
+                    <div
+                        style="margin-top:15px; border-top: 1px solid #eee; padding-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><strong>Total Invoiced:</strong> <span id="inv-total-amount">AED 0.00</span></div>
+                        <div><strong>Total Received:</strong> <span id="inv-total-received">AED 0.00</span></div>
+                        <div><strong>Total Referral Fee:</strong> <span id="inv-total-referral">AED 0.00</span></div>
+                        <div><strong>Output VAT (5%):</strong> <span id="inv-total-vat">AED 0.00</span></div>
+                        <div
+                            style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; font-weight: bold; font-size: 1.1em;">
+                            <strong>Amount Outstanding:</strong> <span id="inv-total-outstanding">AED 0.00</span>
+                        </div>
+                    </div>
+            
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
+                </div>
             </div>
         </div>
+        <!-- MODIFICATION START: Project Invoices Tab -->
+        <div id="project-invoices-tab" class="tab-content">
+            <div class="tool-card">
+                <h3>Project Invoices Summary</h3>
+                <div class="table-controls">
+                    <select id="project-invoice-project-select" class="table-search-input">
+                        <option value="">-- All Projects --</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table class="output-table" id="project-invoices-summary-table">
+                        <thead>
+                            <tr>
+                                <th>Project No</th>
+                                <th>Client Name</th>
+                                <th style="text-align:right;">Total Project Amount</th>
+                                <th style="text-align:right;">Total Invoiced (Paid)</th>
+                                <th style="text-align:right;">Balance to be Invoiced</th>
+                            </tr>
+                        </thead>
+                        <tbody id="project-invoices-summary-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="ledger-tab" class="tab-content">
+            <div class="hr-layout" style="grid-template-columns: 1fr 2.5fr;">
+                <!-- Left Panel -->
+                <div>
+                    <!-- Add Journal Entry -->
+                    <div class="form-card" style="margin-bottom: 20px;">
+                        <h3>Add Journal Entry</h3>
+                        <div class="input-group">
+                            <label>Date</label>
+                            <input type="date" id="led-date">
+                        </div>
+                        <div class="input-group">
+                            <label>Account</label>
+                            <select id="led-account">
+                                <option value="">— Select Account —</option>
+                                <option>Salaries</option>
+                                <option>Bonus</option>
+                                <option>Staff Loans</option>
+                                <option>Employee Benefits</option>
+                                <option>Recruitment</option>
+                                <option>Office Rent</option>
+                                <option>Utilities</option>
+                                <option>Office Supplies</option>
+                                <option>Maintenance</option>
+                                <option>Petty Cash</option>
+                                <option>Internet &amp; Telecom</option>
+                                <option>Software Subscriptions</option>
+                                <option>Travel &amp; Transport</option>
+                                <option>Printing &amp; Stationery</option>
+                                <option>Project Fees</option>
+                                <option>Consultation Fees</option>
+                                <option>Referral Income</option>
+                                <option>Bank Charges</option>
+                                <option>Tax &amp; VAT</option>
+                                <option>Insurance</option>
+                                <option>Miscellaneous</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Description</label>
+                            <input type="text" id="led-desc" placeholder="e.g. Office rent March">
+                        </div>
+                        <div class="input-group">
+                            <label>Debit (AED)</label>
+                            <input type="number" id="led-debit" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="input-group">
+                            <label>Credit (AED)</label>
+                            <input type="number" id="led-credit" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="input-group">
+                            <label>Note (optional)</label>
+                            <input type="text" id="led-note" placeholder="Optional note">
+                        </div>
+                        <button id="led-add-btn" class="primary-button" style="width:100%; margin-top:4px;">Add Entry</button>
+                        <div style="margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
+                            <label style="font-size:0.85em; color:#666; display:block; margin-bottom:4px;">+ Custom Account</label>
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="led-new-account" placeholder="Account name" style="flex:1; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.85em;">
+                                <button id="led-add-account-btn" class="secondary-button" style="padding:5px 10px; font-size:0.85em; white-space:nowrap;">Add</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Recurring Expenses -->
+                    <div class="form-card">
+                        <h3>Recurring Expenses</h3>
+                        <div class="input-group">
+                            <label>Name</label>
+                            <input type="text" id="sub-name" placeholder="e.g. Adobe CC">
+                        </div>
+                        <div class="input-group">
+                            <label>Account</label>
+                            <select id="sub-account">
+                                <option value=""> Select </option>
+                                <option selected>Software Subscriptions</option>
+                                <option>Office Rent</option>
+                                <option>Utilities</option>
+                                <option>Internet &amp; Telecom</option>
+                                <option>Insurance</option>
+                                <option>Maintenance</option>
+                                <option>Miscellaneous</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Amount (AED)</label>
+                            <input type="number" id="sub-amount" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="input-group">
+                            <label>Subscribe Date</label>
+                            <input type="date" id="sub-subscribe-date">
+                        </div>
+                        <div class="input-group">
+                            <label>Renewal Date</label>
+                            <input type="date" id="sub-renewal-date">
+                        </div>
+                        <button id="sub-add-btn" class="primary-button" style="width:100%; margin-top:4px;">+ Add Recurring</button>
+                        <div id="subs-list" style="margin-top:14px;"></div>
+                        <div style="margin-top:14px; background:#f0f7ff; padding:12px; border-radius:6px; border:1px solid #bee3f8;">
+                            <label style="font-weight:600; font-size:0.88em; display:block; margin-bottom:8px;">Post to Ledger for Month:</label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="month" id="sub-month" style="flex:1; padding:5px 8px; border:1px solid #ccc; border-radius:4px;">
+                                <button id="sub-import-btn" class="primary-button" style="padding:6px 12px; white-space:nowrap;">Add to Ledger</button>
+                            </div>
+                            <div id="sub-import-msg" style="margin-top:6px; font-size:0.8em; color:#2d6a4f;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="tool-card">
+                    <h3>Ledger</h3>
+                    <!-- Summary Cards -->
+                    <div class="ledger-summary-cards" id="ledger-summary-cards" style="margin-bottom:16px;"></div>
+                    <!-- Search & Filters -->
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                        <div style="flex:2; min-width:180px;">
+                            <label style="font-size:0.8em; color:#555;">Search</label>
+                            <input type="text" id="led-search" placeholder="Date, description, account, note" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.88em;">
+                        </div>
+                        <div style="min-width:150px;">
+                            <label style="font-size:0.8em; color:#555;">Account</label>
+                            <select id="led-filter-account" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.88em;">
+                                <option value="">All Accounts</option>
+                                <option>Salaries</option><option>Bonus</option><option>Staff Loans</option>
+                                <option>Employee Benefits</option><option>Recruitment</option>
+                                <option>Office Rent</option><option>Utilities</option><option>Office Supplies</option>
+                                <option>Maintenance</option><option>Petty Cash</option>
+                                <option>Internet &amp; Telecom</option><option>Software Subscriptions</option>
+                                <option>Travel &amp; Transport</option><option>Printing &amp; Stationery</option>
+                                <option>Project Fees</option><option>Consultation Fees</option>
+                                <option>Referral Income</option><option>Bank Charges</option>
+                                <option>Tax &amp; VAT</option><option>Insurance</option><option>Miscellaneous</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:0.8em; color:#555;">From</label>
+                            <input type="date" id="led-filter-from" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.88em;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.8em; color:#555;">To</label>
+                            <input type="date" id="led-filter-to" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.88em;">
+                        </div>
+                        <div style="display:flex; gap:6px; align-self:flex-end;">
+                            <button id="led-clear-filters" class="secondary-button" style="padding:5px 12px; font-size:0.85em;">&#10005; Clear</button>
+                            <button id="led-export-csv" class="secondary-button" style="padding:5px 12px; font-size:0.85em;">&#8595; CSV</button>
+                        </div>
+                    </div>
+                    <!-- Ledger Table -->
+                    <div style="overflow-x:auto;">
+                        <table class="output-table" id="led-table" style="margin:0;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th style="min-width:200px;">Description</th>
+                                    <th>Account</th>
+                                    <th style="text-align:right;">Debit (AED)</th>
+                                    <th style="text-align:right;">Credit (AED)</th>
+                                    <th style="text-align:right;">Balance</th>
+                                    <th>Note</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="led-tbody">
+                                <tr><td colspan="8" style="text-align:center; color:#999; padding:24px;">No entries yet. Add your first entry on the left.</td></tr>
+                            </tbody>
+                            <tfoot id="led-tfoot"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ledger Tab -->
+                <!-- MODIFICATION END -->
     </div>
- </div>
     <!-- Staff Details Modal -->
     <div id="staff-details-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="max-width: 900px;">
@@ -1318,6 +1637,7 @@
     <script src="js/pdf_generator.js"></script>
     <script src="js/database.js"></script>
     <script src="js/efficiency_analyzer.js"></script>
+    <script src="js/ledger.js"></script>
     <script src="js/hr_management.js"></script>
 
 </body>
