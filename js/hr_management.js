@@ -112,7 +112,7 @@ function cacheDOMElements() {
         'payslip-preview', 'download-payslip-pdf-btn', 'payroll-summary-body', 'summary-month-display',
         'download-offer-pdf-btn',
         // MODIFICATION: New element IDs
-        'asset-project-no', 'asset-price', 'asset-date', 'asset-warranty-expiry', 'asset-note1', 'asset-note2',
+        'asset-project-no', 'asset-price', 'asset-salvage-value', 'asset-useful-life', 'asset-depreciation-rate', 'asset-depreciation-method', 'asset-auto-calculate', 'asset-item-code', 'asset-type', 'asset-location', 'asset-department', 'asset-date', 'asset-warranty-expiry', 'asset-note1', 'asset-note2',
         'add-asset-btn', 'asset-list-body', 'export-xml-btn', 'export-zip-btn', 'download-wps-sif-btn',
         'letter-sub-tabs', 'compose-letter-sub-tab', 'draft-letters-sub-tab', 'sent-letters-sub-tab', 'letter-templates-sub-tab',
         'draft-count', 'sent-count', 'letter-recipient-name', 'letter-recipient-designation', 'letter-recipient-company',
@@ -121,7 +121,8 @@ function cacheDOMElements() {
         'info-letter-type', 'info-letter-template', 'info-letter-status', 'info-word-count', 'drafts-list-body',
         'sent-list-body', 'templates-catalog', 'letter-type-select', 'letter-template-select', 'load-template-btn', 'letter-preview-modal',
         'close-letter-preview-btn', 'letter-management-preview-area', 'download-preview-pdf-btn',
-        'project-invoice-project-select', 'project-invoices-summary-body'
+        'project-invoice-project-select', 'project-invoices-summary-body',
+        'inv-column-selector', 'inv-refresh-btn', 'inv-status-msg'
     ];
 
     DOMElements.letterRecipientName = document.getElementById('letter-recipient-name');
@@ -218,12 +219,35 @@ function setupEventListeners() {
             if (el) el.addEventListener('input', renderInvoicesTab);
         });
         document.getElementById('inv-reset-btn')?.addEventListener('click', () => {
-            ['inv-search', 'inv-filter-type', 'inv-date-start', 'inv-date-end', 'inv-min-amount', 'inv-max-amount', 'inv-fee-percent'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('inv-filter-referral').checked = false;
-            document.getElementById('inv-sort-by').value = 'date-desc';
+            ['inv-search', 'inv-filter-type', 'inv-date-start', 'inv-date-end', 'inv-min-amount', 'inv-max-amount', 'inv-fee-percent'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const refCheck = document.getElementById('inv-filter-referral');
+            if (refCheck) refCheck.checked = false;
+            const sortSelect = document.getElementById('inv-sort-by');
+            if (sortSelect) sortSelect.value = 'date-desc';
             renderInvoicesTab();
         });
         DOMElements.projectInvoiceProjectSelect?.addEventListener('change', renderProjectInvoicesTab);
+        DOMElements.invColumnSelector?.addEventListener('change', renderInvoicesTab);
+        DOMElements.invRefreshBtn?.addEventListener('click', handleRefreshInvoices);
+    }
+}
+
+async function handleRefreshInvoices() {
+    const statusMsg = DOMElements.invStatusMsg;
+    if (statusMsg) statusMsg.textContent = 'Refreshing data from database...';
+
+    try {
+        await refreshDataAndRender();
+        if (statusMsg) {
+            statusMsg.textContent = 'Data refreshed successfully.';
+            setTimeout(() => { if (statusMsg.textContent === 'Data refreshed successfully.') statusMsg.textContent = ''; }, 3000);
+        }
+    } catch (err) {
+        console.error("Refresh error:", err);
+        if (statusMsg) statusMsg.textContent = 'Error refreshing data.';
     }
 }
 // MODIFICATION START: Universal Search Handler
@@ -749,7 +773,10 @@ function renderAnnualExpenseList() {
                 <td>${exp.description}</td>
                 <td style="text-align:right;">${formatCurrency(exp.amount)}</td>
                 <td>${formatDate(exp.date)}</td>
-                <td><button class="danger-button small-btn" data-id="${exp.id}" data-type="annual-expense">Delete</button></td>
+                <td style="display: flex; gap: 5px;">
+                    <button class="primary-button small-btn add-to-ledger-btn" data-id="${exp.id}" data-desc="${exp.description}" data-amount="${exp.amount}" data-date="${exp.date}">Add to Ledger</button>
+                    <button class="danger-button small-btn" data-id="${exp.id}" data-type="annual-expense">Delete</button>
+                </td>
             `;
     });
 }
@@ -1392,16 +1419,61 @@ function renderVatReport() {
         const outputVat = revenueTotal * 0.05;
         const netVat = outputVat - inputVat;
 
+        // Group by project for the month to show project details
+        const monthOutputDetails = [];
+        projectList.forEach(proj => {
+            let projMonthRevenue = 0;
+            (proj.invoices || []).forEach(inv => {
+                if ((inv.status === 'Paid' || inv.status === 'Raised') && inv.date.startsWith(month)) {
+                    projMonthRevenue += parseFloat(inv.amount || 0);
+                }
+            });
+            if (projMonthRevenue > 0) {
+                monthOutputDetails.push({
+                    jobNo: proj.jobNo,
+                    location: proj.location || 'N/A',
+                    outputVat: projMonthRevenue * 0.05
+                });
+            }
+        });
+
         const monthName = new Date(month + '-02').toLocaleString('default', { month: 'long', year: 'numeric' });
-        const row = tbody.insertRow();
-        row.innerHTML = `
+
+        if (monthOutputDetails.length === 0) {
+            const row = tbody.insertRow();
+            row.innerHTML = `
                 <td>${monthName}</td>
-                <td style="text-align:right;">${formatCurrency(outputVat)}</td>
+                <td>-</td>
+                <td>-</td>
+                <td style="text-align:right;">${formatCurrency(0)}</td>
                 <td style="text-align:right;">${formatCurrency(inputVat)}</td>
                 <td style="text-align:right; font-weight:bold; color: ${netVat >= 0 ? 'red' : 'green'};">
                     ${formatCurrency(Math.abs(netVat))} ${netVat >= 0 ? '(Payable)' : '(Claimable)'}
                 </td>
             `;
+        } else {
+            monthOutputDetails.forEach((detail, idx) => {
+                const row = tbody.insertRow();
+                if (idx === 0) {
+                    row.innerHTML = `
+                        <td rowspan="${monthOutputDetails.length}">${monthName}</td>
+                        <td>${detail.jobNo}</td>
+                        <td>${detail.location}</td>
+                        <td style="text-align:right;">${formatCurrency(detail.outputVat)}</td>
+                        <td rowspan="${monthOutputDetails.length}" style="text-align:right;">${formatCurrency(inputVat)}</td>
+                        <td rowspan="${monthOutputDetails.length}" style="text-align:right; font-weight:bold; color: ${netVat >= 0 ? 'red' : 'green'};">
+                            ${formatCurrency(Math.abs(netVat))} ${netVat >= 0 ? '(Payable)' : '(Claimable)'}
+                        </td>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <td>${detail.jobNo}</td>
+                        <td>${detail.location}</td>
+                        <td style="text-align:right;">${formatCurrency(detail.outputVat)}</td>
+                    `;
+                }
+            });
+        }
     });
 }
 
@@ -1517,6 +1589,11 @@ async function handleAddAsset() {
         department: DOMElements.assetDepartment.value.trim(),
         projectNo: DOMElements.assetProjectNo.value,
         price: parseFloat(DOMElements.assetPrice.value) || 0,
+        salvageValue: parseFloat(DOMElements.assetSalvageValue.value) || 0,
+        usefulLife: parseFloat(DOMElements.assetUsefulLife.value) || 5,
+        depreciationRate: parseFloat(DOMElements.assetDepreciationRate.value) || 0,
+        depreciationMethod: DOMElements.assetDepreciationMethod.value,
+        autoCalculate: DOMElements.assetAutoCalculate.checked,
         purchaseDate: DOMElements.assetDate.value,
         warrantyExpiry: DOMElements.assetWarrantyExpiry.value,
         note1: DOMElements.assetNote1.value.trim(),
@@ -1528,8 +1605,54 @@ async function handleAddAsset() {
     }
     await DB.addAsset(asset);
     alert('Asset added successfully.');
-    [DOMElements.assetItemCode, DOMElements.assetType, DOMElements.assetLocation, DOMElements.assetDepartment, DOMElements.assetProjectNo, DOMElements.assetPrice, DOMElements.assetDate, DOMElements.assetWarrantyExpiry, DOMElements.assetNote1, DOMElements.assetNote2].forEach(el => el.value = '');
+    [DOMElements.assetItemCode, DOMElements.assetType, DOMElements.assetLocation, DOMElements.assetDepartment, DOMElements.assetProjectNo, DOMElements.assetPrice, DOMElements.assetSalvageValue, DOMElements.assetUsefulLife, DOMElements.assetDepreciationRate, DOMElements.assetDate, DOMElements.assetWarrantyExpiry, DOMElements.assetNote1, DOMElements.assetNote2].forEach(el => el.value = '');
     await refreshDataAndRender();
+}
+
+function calculateDepreciation(asset) {
+    if (!asset.autoCalculate) return asset.price;
+
+    const cost = asset.price;
+    const salvage = asset.salvageValue || 0;
+    const life = asset.usefulLife || 5;
+    const purchaseDate = new Date(asset.purchaseDate);
+    const today = new Date();
+
+    // Years elapsed (accurate fraction)
+    const diffTime = Math.abs(today - purchaseDate);
+    const yearsPassed = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+
+    // If life is exceeded, value is salvage
+    if (yearsPassed >= life) return salvage;
+
+    switch (asset.depreciationMethod) {
+        case 'double-declining':
+            const r = 2 / life;
+            return cost * Math.pow(1 - r, yearsPassed);
+
+        case 'syd':
+            // Sum of Years' Digits: Life * (Life + 1) / 2
+            const sumDigits = (life * (life + 1)) / 2;
+            let currentVal = cost;
+            const depreciableAmount = cost - salvage;
+
+            // Loop through years to find current book value
+            let totalDepr = 0;
+            const fullYears = Math.floor(yearsPassed);
+            for (let i = 0; i < fullYears; i++) {
+                totalDepr += depreciableAmount * ((life - i) / sumDigits);
+            }
+            // Add fraction of the current year
+            const remainingFraction = yearsPassed - fullYears;
+            totalDepr += depreciableAmount * ((life - fullYears) / sumDigits) * remainingFraction;
+
+            return Math.max(salvage, cost - totalDepr);
+
+        case 'straight-line':
+        default:
+            const annualDepr = (cost - salvage) / life;
+            return Math.max(salvage, cost - (annualDepr * yearsPassed));
+    }
 }
 
 function renderAssetList() {
@@ -1541,8 +1664,10 @@ function renderAssetList() {
         return;
     }
     assetList.forEach(asset => {
-        const qrData = `Code: ${asset.itemCode}, Type: ${asset.type}, Location: ${asset.location}`;
         const row = tbody.insertRow();
+        const currentValue = calculateDepreciation(asset);
+        const deprToDate = asset.price - currentValue;
+
         row.innerHTML = `
                 <td>${asset.itemCode}</td>
                 <td>${asset.type}</td>
@@ -1550,9 +1675,12 @@ function renderAssetList() {
                 <td>${asset.department}</td>
                 <td>${asset.projectNo || 'N/A'}</td>
                 <td>${formatCurrency(asset.price)}</td>
+                <td style="color: #666; font-size:0.85em;">
+                    ${asset.depreciationMethod === 'straight-line' ? 'SL' : asset.depreciationMethod === 'double-declining' ? 'DDB' : 'SYD'}
+                </td>
+                <td style="color: #e67e22;">${formatCurrency(deprToDate)}</td>
+                <td style="color: #27ae60; font-weight: bold;">${formatCurrency(currentValue)}</td>
                 <td>${formatDate(asset.purchaseDate)}</td>
-                <td>${formatDate(asset.warrantyExpiry)}</td>
-                <td>${qrData}</td>
                 <td><button class="danger-button small-btn" data-id="${asset.id}" data-type="asset">Delete</button></td>
             `;
     });
@@ -1647,6 +1775,26 @@ function handleTableActions(e) {
     }
     if (e.target.matches('.danger-button[data-type="annual-expense"]')) {
         if (confirm('Delete this annual expense?')) DB.delete(DB.STORES.OFFICE_EXPENSES, parseInt(e.target.dataset.id)).then(refreshDataAndRender);
+    }
+    // MODIFICATION: Handle adding annual expense to ledger
+    if (e.target.matches('.add-to-ledger-btn')) {
+        const { desc, amount, date } = e.target.dataset;
+        if (confirm(`Add "${desc}" of AED ${amount} to Ledger?`)) {
+            if (window.LedgerManager) {
+                window.LedgerManager.addEntry({
+                    date: date,
+                    description: `Annual Expense: ${desc}`,
+                    account: 'Miscellaneous',
+                    debit: parseFloat(amount) || 0,
+                    credit: 0,
+                    note: 'Added from Annual Expenses tab'
+                }).then(() => {
+                    alert('Added to Ledger successfully.');
+                });
+            } else {
+                alert('Ledger Manager not found.');
+            }
+        }
     }
 }
 
@@ -1753,13 +1901,14 @@ function renderInvoicesTab() {
             proj.invoices.forEach(inv => {
                 allInvoices.push({
                     ...inv,
+                    jobNo: proj.jobNo,
                     projectDescription: proj.projectDescription,
                     projectType: proj.projectType,
                     clientName: proj.clientName,
                     location: proj.location,
-                    // Ensure numeric amounts
-                    amount: parseFloat(inv.amount || 0),
-                    received: parseFloat(inv.received || 0),
+                    // Ensure numeric amounts - map 'total' to 'amount' and 'paymentDetails.amountPaid' to 'received'
+                    amount: parseFloat(inv.total || inv.amount || 0),
+                    received: parseFloat(inv.paymentDetails?.amountPaid || inv.received || 0),
                     feePercentage: parseFloat(inv.feePercentage || 0)
                 });
             });
@@ -1821,6 +1970,19 @@ function renderInvoicesTab() {
     let totalReceived = 0;
     let totalReferralFee = 0;
 
+    // Get visible columns from selector
+    const visibleCols = Array.from(DOMElements.invColumnSelector?.querySelectorAll('input[type="checkbox"]:checked') || [])
+        .map(cb => cb.dataset.col);
+
+    // Update table header visibility
+    const headerRow = document.getElementById('invoices-header-row');
+    if (headerRow) {
+        headerRow.querySelectorAll('th').forEach(th => {
+            const col = th.dataset.col;
+            th.style.display = visibleCols.includes(col) ? '' : 'none';
+        });
+    }
+
     filtered.forEach(inv => {
         totalInvoiced += inv.amount;
         totalReceived += inv.received || 0;
@@ -1838,19 +2000,28 @@ function renderInvoicesTab() {
         else if (inv.status === 'Cancelled') statusBadge = '<span class="badge danger">Cancelled</span>';
         else statusBadge = '<span class="badge warning">Raised</span>';
 
-        row.innerHTML = `
-            <td>${formatDate(inv.date)}</td>
-            <td>${inv.invoiceNo || '-'}</td>
-            <td>${inv.projectDescription || '-'}</td>
-            <td>${inv.clientName || '-'}</td>
-            <td>${inv.projectType || '-'}</td>
-            <td>${inv.location || '-'}</td>
-            <td style="text-align:right;">${formatCurrency(inv.amount)}</td>
-            <td style="text-align:right;">${formatCurrency(inv.received)}</td>
-            <td style="text-align:center;">${inv.feePercentage}%</td>
-            <td>${inv.referral || '-'}</td>
-            <td>${statusBadge}</td>
-        `;
+        // Prepare cell map
+        const cells = {
+            date: `<td>${formatDate(inv.date)}</td>`,
+            invoiceNo: `<td>${inv.invoiceNo || '-'}</td>`,
+            projectNo: `<td>${inv.jobNo || '-'}</td>`,
+            project: `<td>${inv.projectDescription || '-'}</td>`,
+            client: `<td>${inv.clientName || '-'}</td>`,
+            type: `<td>${inv.projectType || '-'}</td>`,
+            location: `<td>${inv.location || '-'}</td>`,
+            amount: `<td style="text-align:right;">${formatCurrency(inv.amount)}</td>`,
+            received: `<td style="text-align:right;">${formatCurrency(inv.received)}</td>`,
+            balance: `<td style="text-align:right; font-weight:bold;">${formatCurrency(inv.amount - (inv.received || 0))}</td>`,
+            feePercent: `<td style="text-align:center;">${inv.feePercentage}%</td>`,
+            referral: `<td>${inv.referral || '-'}</td>`,
+            status: `<td>${statusBadge}</td>`
+        };
+
+        let rowHtml = '';
+        visibleCols.forEach(col => {
+            if (cells[col]) rowHtml += cells[col];
+        });
+        row.innerHTML = rowHtml;
     });
 
     if (filtered.length === 0) {
