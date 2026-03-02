@@ -30,8 +30,12 @@ export const ScheduleModule = {
         }
 
         const project = await window.DB.getProject(jobNo);
-        const siteData = await window.DB.getSiteData(jobNo);
-        // FIX: Ensure scheduleOverrides is an array
+        let siteData = await window.DB.getSiteData(jobNo);
+
+        // FIX: Handle undefined siteData and ensure scheduleOverrides is an array
+        if (!siteData) {
+            siteData = { jobNo: jobNo, scheduleOverrides: [], customTasks: [] };
+        }
         if (!Array.isArray(siteData.scheduleOverrides)) {
             siteData.scheduleOverrides = [];
         }
@@ -127,7 +131,11 @@ export const ScheduleModule = {
     },
 
     handleUpdate: async (jobNo, update) => {
-        const siteData = await window.DB.getSiteData(jobNo);   // FIX: Ensure it is an array before using array methods
+        let siteData = await window.DB.getSiteData(jobNo);
+        // FIX: Ensure siteData and scheduleOverrides exist
+        if (!siteData) {
+            siteData = { jobNo: jobNo, scheduleOverrides: [], customTasks: [] };
+        }
         if (!Array.isArray(siteData.scheduleOverrides)) {
             siteData.scheduleOverrides = [];
         }
@@ -277,7 +285,10 @@ export async function showNewTaskModal() {
     if (newTaskDependency) {
         newTaskDependency.innerHTML = '<option value="">-- No Dependency --</option>';
         const project = await window.DB.getProject(AppState.currentJobNo);
-        const siteData = await window.DB.getSiteData(AppState.currentJobNo);
+        let siteData = await window.DB.getSiteData(AppState.currentJobNo);
+
+        // FIX: Handle undefined siteData
+        if (!siteData) siteData = { scheduleOverrides: [], customTasks: [] };
         if (!Array.isArray(siteData.scheduleOverrides)) siteData.scheduleOverrides = [];
 
         const template = window.VILLA_SCHEDULE_TEMPLATE || [];
@@ -300,7 +311,8 @@ export async function saveNewTask() {
 
     if (!name) return alert("Task Name is required");
 
-    const siteData = (await window.DB.getSiteData(AppState.currentJobNo)) || {};
+    let siteData = await window.DB.getSiteData(AppState.currentJobNo);
+    if (!siteData) siteData = { jobNo: AppState.currentJobNo, customTasks: [], scheduleOverrides: [] };
     if (!siteData.customTasks) siteData.customTasks = [];
 
     const newId = 10000 + siteData.customTasks.length + 1;
@@ -331,8 +343,9 @@ export async function showNewTaskModalxxx() {
         // alert('fffff4');
         DOMElements.newTaskDependency.innerHTML = '<option value="">-- No Dependency --</option>';
         const project = await window.DB.getProject(AppState.currentJobNo);
-        const siteData = await window.DB.getSiteData(AppState.currentJobNo);
-        // FIX: Ensure array here too
+        let siteData = await window.DB.getSiteData(AppState.currentJobNo);
+        // FIX: Ensure siteData and array exist
+        if (!siteData) siteData = { scheduleOverrides: [], customTasks: [] };
         if (!Array.isArray(siteData.scheduleOverrides)) siteData.scheduleOverrides = [];
         const template = window.VILLA_SCHEDULE_TEMPLATE || [];
         const currentTasks = window.UrbanAxisSchedule.calculateDynamicSchedule(project, template, siteData.scheduleOverrides);
@@ -353,7 +366,8 @@ export async function saveNewTaskxxx() {
 
     if (!name) return alert("Task Name is required");
 
-    const siteData = (await window.DB.getSiteData(AppState.currentJobNo)) || {};
+    let siteData = await window.DB.getSiteData(AppState.currentJobNo);
+    if (!siteData) siteData = { jobNo: AppState.currentJobNo, customTasks: [], scheduleOverrides: [] };
     // alert('siteData');
     // alert(siteData);
     if (!siteData.customTasks) siteData.customTasks = [];
@@ -389,7 +403,7 @@ export async function getProjectSchedule(projectData, siteData) {
     console.log('allTemplates:');
     console.log(allTemplates);
     // FIX: Ensure array for calculation
-    const overrides = Array.isArray(siteData.scheduleOverrides) ? siteData.scheduleOverrides : [];
+    const overrides = (siteData && Array.isArray(siteData.scheduleOverrides)) ? siteData.scheduleOverrides : [];
     //Calculate schedule
     // Note: Custom tasks need dynamic calculation if they depend on others. 
     // The `calculateDynamicSchedule` function in gantt_chart.js handles scaling linear offset.
@@ -526,7 +540,8 @@ export async function handleGanttUpdate(update, currentJobNo) {
     // alert('bbbbbbb1');
     if (!currentJobNo) return;
     try {
-        const siteData = await window.DB.getSiteData();
+        let siteData = await window.DB.getSiteData(currentJobNo);
+        if (!siteData) siteData = { jobNo: currentJobNo, scheduleOverrides: [], customTasks: [] };
         siteData.scheduleOverrides = siteData.scheduleOverrides || [];
 
         let override = siteData.scheduleOverrides.find(o => o.id === update.id);
@@ -551,7 +566,9 @@ export async function renderGanttChart() {
     if (!AppState.currentJobNo || !window.UrbanAxisSchedule) return;
     // alert('fffr1');
     const project = await window.DB.getProject(AppState.currentJobNo);
-    const siteData = await window.DB.getSiteData(AppState.currentJobNo);
+    let siteData = await window.DB.getSiteData(AppState.currentJobNo);
+    // FIX: Handle undefined siteData
+    if (!siteData) siteData = { jobNo: AppState.currentJobNo, scheduleOverrides: [], customTasks: [] };
 
     // 1. Get Full Schedule (Template + Custom)
     let finalSchedule = await getProjectSchedule(project, siteData);
