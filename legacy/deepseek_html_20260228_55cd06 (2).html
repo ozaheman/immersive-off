@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Preview + Gantt Schedule</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #f0f2f5; margin: 20px; display: flex; justify-content: center; }
+        .preview-area { max-width: 1400px; width: 100%; background: white; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        .preview-controls { background: #fff; border-bottom: 1px solid #dee2e6; padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tab-button { padding: 8px 16px; border: 1px solid transparent; background: #f8f9fa; border-radius: 30px; font-size: 0.85rem; font-weight: 500; color: #495057; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .tab-button.active { background: #4363d8; color: white; border-color: #2b4ac7; }
+        .preview-actions { display: flex; gap: 12px; align-items: center; }
+        #page-size-selector { padding: 6px 10px; border-radius: 6px; border: 1px solid #ced4da; }
+        #generate-pdf-btn { background: #dc3545; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; }
+        .preview-content-container { background: #f8f9fa; padding: 20px; min-height: 600px; }
+        .preview-tab-content { display: none; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 25px; }
+        .preview-tab-content.active { display: block; }
+        .preview-footer { font-size: 0.8rem; color: #666; text-align: center; border-top: 1px solid #ddd; margin-top: 30px; padding-top: 15px; }
+
+        /* ---------- Gantt styles ---------- */
+        .gantt-container {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .gantt-header {
+            display: flex;
+            background: #f1f3f5;
+            border-bottom: 2px solid #aaa;
+            font-weight: 600;
+        }
+        .gantt-task-list {
+            width: 280px;
+            flex-shrink: 0;
+            background: #fff;
+            border-right: 1px solid #ccc;
+        }
+        .gantt-task-list .header-cell {
+            padding: 12px 10px;
+            border-bottom: 1px solid #ccc;
+            background: #e9ecef;
+            font-size: 0.9rem;
+        }
+        .gantt-timeline {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: #fff;
+        }
+        .timeline-rows {
+            position: relative;
+            min-width: 2000px;      /* enough width for 2+ years */
+            height: 100%;
+        }
+        .timeline-header {
+            display: flex;
+            height: 50px;
+            background: #f1f3f5;
+            border-bottom: 1px solid #aaa;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .timeline-header-cell {
+            flex: 0 0 60px;          /* each month block ~60px */
+            text-align: center;
+            font-size: 0.8rem;
+            padding: 6px 0;
+            border-right: 1px solid #ccc;
+            background: #f1f3f5;
+            font-weight: 600;
+        }
+        .task-row {
+            display: flex;
+            height: 42px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .task-row .task-info {
+            width: 280px;
+            flex-shrink: 0;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            background: #fff;
+            border-right: 1px solid #ccc;
+            font-size: 0.85rem;
+        }
+        .task-info .duration-badge {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 2px 8px;
+            margin-left: 10px;
+            font-size: 0.7rem;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+        .task-row .timeline-area {
+            flex: 1;
+            position: relative;
+            background: #fff;
+        }
+        .gantt-bar {
+            position: absolute;
+            height: 26px;
+            top: 8px;
+            border-radius: 4px;
+            background-color: #4363d8;
+            opacity: 0.8;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            cursor: default;
+        }
+        .gantt-bar.critical {
+            background-color: #dc3545;
+        }
+        .timeline-header-cell.month-year {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #333;
+        }
+    </style>
+    <!-- PDF libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script>
+        // Dummy base64 (not used, but kept for compatibility)
+        const LOGO_BASE64 = "";
+        const WM_BASE64 = "";
+    </script>
+    <!-- PDF Generator (with exact margin and html2canvas settings) -->
+    <script>
+        window.PDFGenerator = (() => {
+            const generate = async ({ previewId, projectJobNo, pageSize = 'a4_portrait', fileName: customFileName, watermarkData }) => {
+                if (!previewId) { alert("Missing previewId"); return; }
+                const { jsPDF } = window.jspdf;
+                const sourceElement = document.getElementById(previewId);
+                if (!sourceElement) { alert("Element not found"); return; }
+                alert('Generating PDF...');
+                try {
+                    const logoElementToHide = sourceElement.querySelector('.preview-header-image');
+                    const footerElementToHide = sourceElement.querySelector('.preview-footer');
+                    if (logoElementToHide) logoElementToHide.style.display = 'none';
+                    if (footerElementToHide) footerElementToHide.style.display = 'none';
+
+                    const [format, orientation] = pageSize.toLowerCase().split('_');
+                    const doc = new jsPDF({
+                        orientation: orientation === 'landscape' ? 'l' : 'p',
+                        unit: 'mm',
+                        format: format
+                    });
+                    const PAGE_WIDTH = doc.internal.pageSize.getWidth();
+                    const PAGE_HEIGHT = doc.internal.pageSize.getHeight();
+                    const TOP_MARGIN = 20, BOTTOM_MARGIN = 20;
+                    const isSchedule = previewId.includes('schedule');
+                    const SIDE_MARGIN = isSchedule ? 5 : 10;
+                    const CONTENT_WIDTH = PAGE_WIDTH - (SIDE_MARGIN * 2);
+
+                    // Minimal header/footer (no watermark images)
+                    const addHeaderFooterWatermark = () => {
+                        const pageCount = doc.internal.getNumberOfPages();
+                        for (let i = 1; i <= pageCount; i++) {
+                            doc.setPage(i);
+                            doc.setFontSize(9); doc.setTextColor(150,150,150);
+                            doc.text(`Page ${i} of ${pageCount}`, PAGE_WIDTH - SIDE_MARGIN - 10, PAGE_HEIGHT - 10);
+                            doc.setLineWidth(0.2);
+                            doc.line(SIDE_MARGIN, PAGE_HEIGHT - BOTTOM_MARGIN, PAGE_WIDTH - SIDE_MARGIN, PAGE_HEIGHT - BOTTOM_MARGIN);
+                            doc.setFontSize(8);
+                            doc.text("P.O. BOX 341763, DUBAI, U.A.E. Tel. 04262336, E-mail: projects@immersive.ae", PAGE_WIDTH/2, PAGE_HEIGHT-13, { align:'center' });
+                            doc.text("Website: www.immersiveec.ae", PAGE_WIDTH/2, PAGE_HEIGHT-9, { align:'center' });
+                        }
+                    };
+
+                    // Save original styles
+                    const originalStyles = {
+                        width: sourceElement.style.width,
+                        maxWidth: sourceElement.style.maxWidth,
+                        height: sourceElement.style.height,
+                        maxHeight: sourceElement.style.maxHeight,
+                        overflow: sourceElement.style.overflow,
+                        position: sourceElement.style.position
+                    };
+
+                    // Expand to full scroll width (capped at 4000px for performance)
+                    const capturedWidth = Math.min(4000, Math.max(800, sourceElement.scrollWidth));
+                    sourceElement.style.setProperty('width', capturedWidth + 'px', 'important');
+                    sourceElement.style.setProperty('max-width', 'none', 'important');
+                    sourceElement.style.setProperty('overflow', 'visible', 'important');
+                    sourceElement.style.setProperty('height', 'auto', 'important');
+
+                    // Expand children (simplified)
+                    const elementsToRestore = [];
+                    sourceElement.querySelectorAll('*').forEach(el => {
+                        const style = window.getComputedStyle(el);
+                        if (style.overflow === 'hidden' || style.overflow === 'auto' || style.overflow === 'scroll') {
+                            elementsToRestore.push({ el, overflow: el.style.overflow, width: el.style.width, maxWidth: el.style.maxWidth });
+                            el.style.setProperty('overflow', 'visible', 'important');
+                            el.style.setProperty('width', 'auto', 'important');
+                            el.style.setProperty('max-width', 'none', 'important');
+                        }
+                    });
+
+                    // Force reflow
+                    sourceElement.offsetHeight;
+                    await new Promise(r => setTimeout(r, 200));
+
+                    await doc.html(sourceElement, {
+                        callback: function(doc) {
+                            // Restore styles
+                            elementsToRestore.forEach(item => {
+                                item.el.style.overflow = item.overflow;
+                                item.el.style.width = item.width;
+                                item.el.style.maxWidth = item.maxWidth;
+                            });
+                            Object.assign(sourceElement.style, originalStyles);
+                            if (logoElementToHide) logoElementToHide.style.display = '';
+                            if (footerElementToHide) footerElementToHide.style.display = '';
+                            addHeaderFooterWatermark();
+                            const fileName = (customFileName ? `${customFileName}.pdf` : `${(projectJobNo || 'document')}_${previewId}.pdf`).replace(/\.pdf\.pdf$/i,'.pdf');
+                            doc.save(fileName);
+                        },
+                        margin: [TOP_MARGIN + 15, SIDE_MARGIN, BOTTOM_MARGIN, SIDE_MARGIN],
+                        width: CONTENT_WIDTH,
+                        windowWidth: capturedWidth,
+                        autoPaging: 'text',
+                        html2canvas: {
+                            useCORS: true,
+                            logging: false,
+                            scale: 0.2,
+                            letterRendering: true,
+                            backgroundColor: '#ffffff',
+                            imageTimeout: 15000,
+                            removeContainer: true
+                        }
+                    });
+                } catch(e) { console.error(e); alert("PDF generation failed: " + e.message); }
+            };
+            return { generate };
+        })();
+    </script>
+    <!-- Gantt rendering script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.preview-tab-content');
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabId = btn.dataset.tab;
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const activeContent = document.getElementById(tabId + '-preview');
+                    if (activeContent) activeContent.classList.add('active');
+                });
+            });
+
+            // Build Gantt for schedule tab
+            const scheduleDiv = document.getElementById('villa-schedule-preview');
+            if (!scheduleDiv) return;
+
+            // ----- Task data (from original left list) -----
+            const tasks = [
+                { name: "MOBILIZATION", start: 0, duration: 52, critical: false },
+                { name: "SHORING WORKS", start: 26, duration: 16, critical: false },
+                { name: "COMPACTION & PCC", start: 52, duration: 26, critical: true },
+                { name: "ELECTRICAL WORKS", start: 52, duration: 404, critical: false },
+                { name: "WATER-PROOFING", start: 59, duration: 109, critical: true },
+                { name: "SUB-STRUCTURE", start: 91, duration: 117, critical: true },
+                { name: "PLUMBING/DRAINAGE", start: 93, duration: 379, critical: false },
+                { name: "FIRE FIGHTING", start: 151, duration: 335, critical: true },
+                { name: "BLOCK WORK", start: 170, duration: 158, critical: true },
+                { name: "FIRST FLOOR SLAB", start: 178, duration: 38, critical: false },
+                { name: "ROOF SLAB WORKS", start: 216, duration: 38, critical: true },
+                { name: "PLASTERING", start: 219, duration: 98, critical: true },
+                { name: "STEEL STAIRCASE", start: 283, duration: 15, critical: false },
+                { name: "ALUMINIUM WORK", start: 283, duration: 173, critical: false },
+                { name: "UPPER ROOF SLAB", start: 286, duration: 19, critical: true },
+                { name: "GYPSUM CEILING", start: 304, duration: 114, critical: true },
+                { name: "EXTERNAL FINISHES", start: 313, duration: 94, critical: true },
+                { name: "B/WALL WORKS", start: 322, duration: 62, critical: true },
+                { name: "AC WORK", start: 338, duration: 115, critical: false },
+                { name: "INTERNAL FINISHES", start: 344, duration: 106, critical: true },
+                { name: "JOINERY WORK", start: 357, duration: 54, critical: false },
+                { name: "LIFT WORK", start: 366, duration: 119, critical: true },
+                { name: "WATER TANK", start: 386, duration: 16, critical: false },
+                { name: "SWIMMING POOL", start: 386, duration: 45, critical: true },
+                { name: "LANDSCAPE WORK", start: 389, duration: 93, critical: true },
+                { name: "INTERCOM/CCTV", start: 412, duration: 23, critical: false },
+                { name: "MAIN GATE WORK", start: 425, duration: 51, critical: false },
+                { name: "SNAGGING", start: 473, duration: 6, critical: false },
+                { name: "AUTHORITY INSPECTION", start: 479, duration: 4, critical: false }
+            ];
+
+            const projectStart = new Date(2026, 1, 28); // Feb 28, 2026
+            const PX_PER_DAY = 2.2; // makes total width ~2000px
+
+            // Generate month headers from Feb 2026 to early 2029
+            function generateMonthHeaders() {
+                let months = [];
+                let current = new Date(2026, 1, 1);
+                const end = new Date(2029, 0, 1);
+                while (current < end) {
+                    months.push({
+                        year: current.getFullYear(),
+                        month: current.getMonth(),
+                        label: current.toLocaleString('default', { month: 'short' }) + ' ' + current.getFullYear().toString().slice(-2)
+                    });
+                    current.setMonth(current.getMonth() + 1);
+                }
+                return months;
+            }
+            const months = generateMonthHeaders();
+
+            // Build timeline header HTML
+            let timelineHeaderHtml = '';
+            months.forEach(m => {
+                timelineHeaderHtml += `<div class="timeline-header-cell month-year" style="flex-basis:${PX_PER_DAY * 28}px;">${m.label}</div>`;
+            });
+
+            // Build task rows
+            let rowsHtml = '';
+            tasks.forEach(t => {
+                const startPx = t.start * PX_PER_DAY;
+                const widthPx = t.duration * PX_PER_DAY;
+                const barClass = t.critical ? 'gantt-bar critical' : 'gantt-bar';
+                const startDate = new Date(projectStart.getTime() + t.start * 86400000);
+                const endDate = new Date(projectStart.getTime() + (t.start + t.duration) * 86400000);
+                const dateRange = `${startDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} - ${endDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}`;
+                rowsHtml += `
+                    <div class="task-row">
+                        <div class="task-info">
+                            <span style="flex:1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${t.name}">${t.name}</span>
+                            <span class="duration-badge" title="${dateRange}">${t.duration}d</span>
+                        </div>
+                        <div class="timeline-area">
+                            <div class="${barClass}" style="left: ${startPx}px; width: ${widthPx}px;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Compose full Gantt HTML
+            const ganttHtml = `
+                <div class="gantt-container">
+                    <div class="gantt-header">
+                        <div class="gantt-task-list">
+                            <div class="header-cell">Task &nbsp;&nbsp; (duration)</div>
+                        </div>
+                        <div class="gantt-timeline">
+                            <div class="timeline-header">${timelineHeaderHtml}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex:1; overflow: hidden;">
+                        <div class="gantt-task-list" style="border-right:1px solid #ccc; background:#fafafa;"></div>
+                        <div class="gantt-timeline" style="overflow-x:auto; overflow-y:auto; position:relative;">
+                            <div class="timeline-rows" style="min-width:${PX_PER_DAY * 900}px;">
+                                ${rowsHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Insert into schedule preview
+            const scheduleInner = document.getElementById('villa-schedule-preview1');
+            if (scheduleInner) {
+                scheduleInner.innerHTML = ganttHtml;
+            } else {
+                scheduleDiv.innerHTML = `<h1>Construction Schedule</h1>${ganttHtml}<div class="preview-footer">P.O. BOX 341763, DUBAI, U.A.E. Tel. 04262336, E-mail: projects@immersive.ae<br>Website: www.immersiveec.ae</div>`;
+            }
+
+            // PDF generation button
+            document.getElementById('generate-pdf-btn').addEventListener('click', async () => {
+                const activeTab = document.querySelector('.preview-tab-content.active');
+                if (!activeTab) return alert('No active tab');
+                const previewId = activeTab.id;
+                const pageSize = document.getElementById('page-size-selector').value;
+                await window.PDFGenerator.generate({
+                    previewId: previewId,
+                    projectJobNo: 'RRC/2026/001',
+                    pageSize: pageSize,
+                    fileName: 'Project_Schedule'
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="preview-area">
+        <div class="preview-controls">
+            <div class="tabs preview-tabs">
+                <button class="tab-button" data-tab="brief-proposal">Brief Proposal</button>
+                <button class="tab-button" data-tab="full-agreement">Full Agreement</button>
+                <button class="tab-button" data-tab="assignment-order">Assignment Order</button>
+                <button class="tab-button" data-tab="proforma">Proforma</button>
+                <button class="tab-button" data-tab="tax-invoice">Tax Invoice</button>
+                <button class="tab-button" data-tab="receipt">Receipt</button>
+                <button class="tab-button" data-tab="tender-package">Tender Package</button>
+                <button class="tab-button" data-tab="vendor-list">Vendor List</button>
+                <button class="tab-button" data-tab="payment-certificate">Payment Cert.</button>
+                <button class="tab-button active" data-tab="villa-schedule">Schedule</button>
+                <button class="tab-button" data-tab="project-letter">Letter</button>
+                <button class="tab-button" data-tab="project-report">Project Report</button>
+            </div>
+            <div class="preview-actions">
+                <select id="page-size-selector">
+                    <option value="A4_portrait">A4 Portrait</option>
+                    <option value="A4_landscape">A4 Landscape</option>
+                    <option value="A3_portrait">A3 Portrait</option>
+                    <option value="A3_landscape" selected>A3 Landscape</option>
+                </select>
+                <button id="generate-pdf-btn">Generate PDF</button>
+            </div>
+        </div>
+        <div class="preview-content-container">
+            <!-- Other tabs (minimal placeholders) -->
+            <div id="brief-proposal-preview" class="preview-tab-content">Brief proposal (sample content)</div>
+            <div id="full-agreement-preview" class="preview-tab-content">Full agreement (sample)</div>
+            <div id="assignment-order-preview" class="preview-tab-content">Assignment order</div>
+            <div id="proforma-preview" class="preview-tab-content">Proforma</div>
+            <div id="tax-invoice-preview" class="preview-tab-content">Tax Invoice</div>
+            <div id="receipt-preview" class="preview-tab-content">Receipt</div>
+            <div id="tender-package-preview" class="preview-tab-content">Tender package summary</div>
+            <div id="vendor-list-preview" class="preview-tab-content">Vendor list</div>
+            <div id="payment-certificate-preview" class="preview-tab-content">Payment certificate</div>
+
+            <!-- Schedule tab (active) with Gantt -->
+            <div id="villa-schedule-preview" class="preview-tab-content active">
+                <h1>Construction Schedule</h1>
+                <div id="villa-schedule-preview1" style="margin-top:15px;"></div>
+                <div class="preview-footer">P.O. BOX 341763, DUBAI, U.A.E. Tel. 04262336, E-mail: projects@immersive.ae<br>Website: www.immersiveec.ae</div>
+            </div>
+
+            <div id="project-letter-preview" class="preview-tab-content">Letter</div>
+            <div id="project-report-preview" class="preview-tab-content">Project report</div>
+        </div>
+    </div>
+</body>
+</html>
