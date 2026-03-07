@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Gallery with Annotator</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f4f4f4; }
+        .container { max-width: 1200px; margin: 20px auto; padding: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 8px; }
+        h1 { text-align: center; color: #333; }
+        .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; margin-bottom: 20px; border-radius: 6px; }
+        .controls input, .controls select, .controls button { margin: 5px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .controls button { background-color: #007bff; color: white; border-color: #007bff; cursor: pointer; }
+        .controls button:hover { background-color: #0056b3; }
+        #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        #gallery.details-view { grid-template-columns: 1fr; }
+        
+        .thumbnail { position: relative; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background-color: #fff; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+        .thumbnail:not(.placeholder):hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; }
+        .thumbnail .img-container { width: 100%; height: 120px; background-color: #f0f0f0; display: flex; align-items: center; justify-content: center; }
+        .thumbnail img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .thumbnail .info { padding: 8px 5px; }
+        .info .title { font-weight: bold; margin: 2px 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
+        .info .title-image { color: #0056b3; }
+        .info .title-pdf { color: #d9534f; }
+        .info .date { margin: 2px 0; font-size: 11px; color: #777; }
+        .page-count { position: absolute; top: 5px; right: 5px; background-color: rgba(0, 0, 0, 0.75); color: white; padding: 3px 7px; font-size: 11px; border-radius: 4px; font-weight: bold; z-index: 1; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .details-view .thumbnail { display: flex; align-items: center; padding: 10px; }
+        .details-view .thumbnail .img-container { width: 100px; height: 100px; flex-shrink: 0; }
+        .details-view .thumbnail .info { text-align: left; padding-left: 15px; }
+
+        /* Modal & Annotator Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); }
+        .modal-content { display: flex; flex-direction: column; position: relative; margin: 2% auto; padding: 0; width: 95%; max-width: 1000px; }
+        .close { position: absolute; top: 0px; right: 15px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; z-index: 1002; cursor: pointer; }
+        
+        #annotation-toolbar { background: #333; padding: 8px; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+        #annotation-toolbar button, #annotation-toolbar input { margin: 0 4px; padding: 6px 10px; background-color: #555; color: white; border: none; cursor: pointer; border-radius: 3px; vertical-align: middle; }
+        #annotation-toolbar button:disabled { background-color: #444; color: #888; cursor: not-allowed; }
+        #annotation-toolbar button.active { background-color: #007bff; }
+        #annotation-toolbar input[type="color"] { padding: 2px; height: 28px; }
+        #annotation-toolbar label { color: white; font-size: 12px; margin-left: 8px; vertical-align: middle; }
+        #annotation-toolbar .separator { border-left: 2px solid #777; margin-left: 8px; padding-left: 8px; display: inline-flex; align-items: center;}
+        #annotation-toolbar input[type="number"], #annotation-toolbar input[type="range"], #annotation-toolbar input[type="checkbox"] { vertical-align: middle; }
+        #annotation-toolbar input[type="number"] { max-width: 60px; }
+        
+        #viewer-container { position: relative; width: 100%; line-height: 0; background-color: #555; }
+        #modal-img, #pdf-canvas { width: 100%; height: auto; }
+        #annotation-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
+        #pdf-controls { background: #333; padding: 8px; color: white; text-align: center; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;}
+        #pdf-controls button { margin: 0 5px; }
+    </style>
+    <!-- PDF.js library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+    </script>
+</head>
+<body>
+    <div class="container"><!-- Gallery markup from previous step --></div>
+    <div id="myModal" class="modal"><!-- Modal markup from previous step --></div>
+
+    <script>
+        // --- Gallery & File Handling (Unchanged) ---
+        document.querySelector('.container').innerHTML = `<h1>My Gallery</h1><div class="controls"><input type="file" id="file-input" multiple accept="image/*,application/pdf" title="Select images or PDFs"><input type="search" id="search-bar" placeholder="Search by name..."><div><select id="sort-by"><option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option><option value="date-new">Date (Newest)</option><option value="date-old">Date (Oldest)</option></select><button id="view-toggle">Details View</button></div></div><div id="gallery"></div>`;
+        const fileInput = document.getElementById('file-input'); const gallery = document.getElementById('gallery'); const searchBar = document.getElementById('search-bar'); const sortBy = document.getElementById('sort-by'); const viewToggle = document.getElementById('view-toggle'); let fileData = [];
+        fileInput.addEventListener('change', (e) => { const files = Array.from(e.target.files); for (const file of files) { const id = `thumb-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`; createPlaceholder(file.name, id); processFile(file, id); } });
+        searchBar.addEventListener('input', () => { const term = searchBar.value.toLowerCase(); fileData.forEach(item => { const el = document.getElementById(item.id); if (el) el.style.display = item.name.toLowerCase().includes(term) ? '' : 'none'; }); });
+        sortBy.addEventListener('change', renderGallery);
+        viewToggle.addEventListener('click', () => { gallery.classList.toggle('details-view'); viewToggle.textContent = gallery.classList.contains('details-view') ? 'Grid View' : 'Details View'; });
+        function createPlaceholder(name, id) { const el = document.createElement('div'); el.id = id; el.className = 'thumbnail placeholder'; el.innerHTML = `<div class="img-container"><div class="spinner"></div></div><div class="info"><p class="title">${name}</p><p class="date">Processing...</p></div>`; gallery.appendChild(el); }
+        async function processFile(file, id) { const src = await readFileAsDataURL(file); let thumb = src, pages = 0; if (file.type === 'application/pdf') { const info = await getPdfInfo(src); thumb = info.thumbnailSrc; pages = info.pageCount; } const item = { id, name: file.name, type: file.type, src, thumbnailSrc: thumb, pageCount: pages, date: new Date(Date.now() - Math.random() * 1e12) }; fileData.push(item); updateThumbnail(item); }
+        function updateThumbnail(item) { const el = document.getElementById(item.id); if (!el) return; let badge = ''; if (item.type === 'application/pdf' && item.pageCount > 0) badge = `<div class="page-count">${item.pageCount} ${item.pageCount === 1 ? 'Page' : 'Pages'}</div>`; let titleClass = item.type.startsWith('image/') ? 'title-image' : item.type === 'application/pdf' ? 'title-pdf' : ''; el.classList.remove('placeholder'); el.innerHTML = `${badge}<div class="img-container"><img src="${item.thumbnailSrc}" alt="${item.name}"></div><div class="info"><p class="title ${titleClass}">${item.name}</p><p class="date">${item.date.toLocaleDateString()}</p></div>`; el.addEventListener('click', () => openModal(item)); }
+        function readFileAsDataURL(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+        async function getPdfInfo(pdfSrc) { try { const pdf = await pdfjsLib.getDocument(pdfSrc).promise; const page = await pdf.getPage(1); const viewport = page.getViewport({ scale: 0.5 }); const canvas = document.createElement('canvas'); canvas.height = viewport.height; canvas.width = viewport.width; await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise; return { thumbnailSrc: canvas.toDataURL('image/jpeg'), pageCount: pdf.numPages }; } catch (error) { console.error('Error getting PDF info:', error); return { thumbnailSrc: '', pageCount: 0 }; } }
+        function filterData(data) { return data.filter(item => item.name.toLowerCase().includes(searchBar.value.toLowerCase())); }
+        function sortData(data) { const dataCopy = [...data]; dataCopy.sort((a,b) => (sortBy.value === 'name-asc') ? a.name.localeCompare(b.name) : (sortBy.value === 'name-desc') ? b.name.localeCompare(a.name) : (sortBy.value === 'date-new') ? b.date - a.date : a.date - b.date); return dataCopy; }
+        function renderGallery() { const sortedData = sortData(filterData(fileData)); const sortedIds = sortedData.map(item => item.id); sortedIds.forEach(id => { const element = document.getElementById(id); if (element) gallery.appendChild(element); }); const allThumbs = gallery.querySelectorAll('.thumbnail'); allThumbs.forEach(thumb => { thumb.style.display = (thumb.classList.contains('placeholder') || sortedIds.includes(thumb.id)) ? '' : 'none'; }); }
+
+        // --- MODAL & ANNOTATOR LOGIC ---
+        document.querySelector('.modal').innerHTML = `<span class="close">&times;</span><div class="modal-content"><div id="annotation-toolbar"><button id="tool-pen" data-tool="pen">Pen</button><button id="tool-highlighter" data-tool="highlighter">Highlighter</button><button id="tool-arrow" data-tool="arrow">Arrow</button><button id="tool-rect" data-tool="rect">Rectangle</button><button id="tool-circle" data-tool="circle">Circle</button><button id="tool-text" data-tool="text">Text</button><button id="tool-cloud" data-tool="cloud">Cloud</button><button id="tool-eraser" data-tool="eraser">Eraser</button><span class="separator"><input type="color" id="color-picker" title="Select text/stroke color" value="#FF0000"><label for="font-size">Size:</label><input type="number" id="font-size" value="20" min="8" max="100" title="Font size"><label for="cloud-arc-size">Cloudiness:</label><input type="range" id="cloud-arc-size" min="5" max="50" value="15" title="Cloud arc size"></span><span id="text-options" class="separator" style="display:none;"><label>BG:</label> <input type="color" id="text-bg-color" title="Text background color" value="#FFFFFF"><input type="checkbox" id="text-stroke-toggle" checked> <label for="text-stroke-toggle">Stroke</label><input type="checkbox" id="text-bg-toggle" checked> <label for="text-bg-toggle">Fill</label></span><span class="separator"><button id="undo-btn" title="Undo (Ctrl+Z)">Undo</button><button id="redo-btn" title="Redo (Ctrl+Y)">Redo</button><button id="clear-annotations">Clear</button><button id="download-btn">Download</button></span></div><div id="viewer-container"><img id="modal-img" style="display:none;"><canvas id="pdf-canvas"></canvas><canvas id="annotation-canvas"></canvas></div><div id="pdf-controls" style="display:none;"><button id="prev-page">Previous</button><span>Page: <span id="page-num"></span> / <span id="page-count"></span></span><button id="next-page">Next</button></div></div>`;
+        const modal = document.getElementById('myModal'); const modalImg = document.getElementById('modal-img'); const closeBtn = document.querySelector('.close'); const pdfCanvas = document.getElementById('pdf-canvas'); 
+        const annotationCanvas = document.getElementById('annotation-canvas'); const annotationCtx = annotationCanvas.getContext('2d'); const textOptionsContainer = document.getElementById('text-options'); const undoBtn = document.getElementById('undo-btn'); const redoBtn = document.getElementById('redo-btn'); const pdfControls = document.getElementById('pdf-controls');
+        let currentItem = null, currentTool = 'pen', isDrawing = false, startX, startY, pdfDoc = null, pageNum = 1, originalWidth, originalHeight;
+        let annotations = {}; let history = {}; let currentPolylinePoints = []; let annotationsToErase = [];
+
+        // History Management (Undo/Redo) - Unchanged
+        function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+        function saveHistoryState() { if (!history[pageNum]) history[pageNum] = { stack: [], index: -1 }; const h = history[pageNum]; if (h.index < h.stack.length - 1) { h.stack = h.stack.slice(0, h.index + 1); } h.stack.push(deepClone(annotations[pageNum] || [])); h.index++; updateHistoryButtons(); }
+        function handleUndo() { const h = history[pageNum]; if (h && h.index > 0) { h.index--; annotations[pageNum] = deepClone(h.stack[h.index]); redrawAnnotations(); updateHistoryButtons(); } }
+        function handleRedo() { const h = history[pageNum]; if (h && h.index < h.stack.length - 1) { h.index++; annotations[pageNum] = deepClone(h.stack[h.index]); redrawAnnotations(); updateHistoryButtons(); } }
+        function updateHistoryButtons() { const h = history[pageNum]; undoBtn.disabled = !h || h.index <= 0; redoBtn.disabled = !h || h.index >= h.stack.length - 1; }
+
+        // --- Core Modal & Canvas Functions ---
+        function openModal(item) {
+            modal.style.display = 'block'; currentItem = item; annotations = {}; history = {};
+            if (item.type.startsWith('image/')) {
+                pdfControls.style.display = 'none'; pdfCanvas.style.display = 'none'; modalImg.style.display = 'block';
+                modalImg.src = item.src;
+                modalImg.onload = () => { originalWidth = modalImg.naturalWidth; originalHeight = modalImg.naturalHeight; pageNum = 1; initializePage(1); };
+            } else if (item.type === 'application/pdf') {
+                modalImg.style.display = 'none'; pdfCanvas.style.display = 'block'; pdfControls.style.display = 'block';
+                loadPdf(item.src);
+            }
+        }
+        async function loadPdf(pdfSrc) { try { pdfDoc = await pdfjsLib.getDocument(pdfSrc).promise; renderPdfPage(1); } catch (error) { console.error('Error loading PDF:', error); } }
+        async function renderPdfPage(num) {
+            pageNum = num; if (!pdfDoc) return; const page = await pdfDoc.getPage(num); const viewport = page.getViewport({ scale: 1.5 });
+            pdfCanvas.height = viewport.height; pdfCanvas.width = viewport.width;
+            await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport }).promise;
+            originalWidth = viewport.width; originalHeight = viewport.height;
+            document.getElementById('page-num').textContent = num; document.getElementById('page-count').textContent = pdfDoc.numPages;
+            initializePage(num);
+        }
+        function initializePage(num) { if (!annotations[num]) annotations[num] = []; if (!history[num]) { history[num] = { stack: [], index: -1 }; saveHistoryState(); } resizeAnnotationCanvas(); updateHistoryButtons(); }
+        
+        // --- REFACTORED SIZING AND DRAWING LOGIC ---
+        function resizeAnnotationCanvas() {
+            if (!originalWidth || !originalHeight) return;
+            const mediaElement = currentItem.type.startsWith('image/') ? modalImg : pdfCanvas;
+            
+            // Set internal canvas resolution to the original media size
+            annotationCanvas.width = originalWidth;
+            annotationCanvas.height = originalHeight;
+            
+            // Set display size of the canvas to match the scaled media element
+            annotationCanvas.style.width = mediaElement.clientWidth + 'px';
+            annotationCanvas.style.height = mediaElement.clientHeight + 'px';
+            
+            redrawAnnotations();
+        }
+        
+        function redrawAnnotations() {
+            annotationCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            const currentAnns = annotations[pageNum] || [];
+            
+            for (const annot of currentAnns) {
+                // All sizes (lineWidth, fontSize) are now absolute to the full-res canvas
+                annotationCtx.strokeStyle = annot.color;
+                annotationCtx.fillStyle = annot.color;
+                annotationCtx.lineWidth = annot.lineWidth || 2;
+                annotationCtx.globalAlpha = annot.opacity || 1.0;
+
+                // All coordinates are multiplied by the full-res canvas dimensions
+                const w = annotationCanvas.width;
+                const h = annotationCanvas.height;
+
+                switch (annot.type) {
+                    case 'pen': case 'highlighter':
+                        annotationCtx.lineCap = 'round'; annotationCtx.beginPath();
+                        annot.points.forEach((p, i) => {
+                            if (i === 0) annotationCtx.moveTo(p.x * w, p.y * h);
+                            else annotationCtx.lineTo(p.x * w, p.y * h);
+                        });
+                        annotationCtx.stroke();
+                        break;
+                    case 'rect': annotationCtx.strokeRect(annot.x * w, annot.y * h, annot.w * w, annot.h * h); break;
+                    case 'circle': annotationCtx.beginPath(); annotationCtx.arc(annot.x * w, annot.y * h, annot.r * w, 0, 2 * Math.PI); annotationCtx.stroke(); break;
+                    case 'arrow': drawArrow(annot.x1 * w, annot.y1 * h, annot.x2 * w, annot.y2 * h, annotationCtx); break;
+                    case 'text':
+                        annotationCtx.font = `${annot.fontSize}px Arial`;
+                        const metrics = annotationCtx.measureText(annot.text);
+                        const pad = 5;
+                        const boxW = metrics.width + 2 * pad;
+                        const boxH = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) + 2 * pad;
+                        const boxX = (annot.x * w) - pad;
+                        const boxY = (annot.y * h) - metrics.actualBoundingBoxAscent - pad;
+                        if (annot.fillEnabled) { annotationCtx.fillStyle = annot.bgColor; annotationCtx.fillRect(boxX, boxY, boxW, boxH); }
+                        if (annot.strokeEnabled) { annotationCtx.strokeStyle = annot.color; annotationCtx.strokeRect(boxX, boxY, boxW, boxH); }
+                        annotationCtx.fillStyle = annot.color;
+                        annotationCtx.fillText(annot.text, annot.x * w, annot.y * h);
+                        break;
+                    case 'cloud': drawCloudFromPoints(annot.points, annot.arcSize, annotationCtx); break;
+                }
+            }
+            annotationCtx.globalAlpha = 1.0;
+        }
+
+        function addAnnotation(annot) { if (!annotations[pageNum]) annotations[pageNum] = []; annotations[pageNum].push(annot); saveHistoryState(); redrawAnnotations(); }
+        function clearAnnotations() { if (annotations[pageNum] && annotations[pageNum].length > 0) { annotations[pageNum] = []; saveHistoryState(); redrawAnnotations(); } }
+        
+        // Event Listeners - Unchanged
+        document.getElementById('annotation-toolbar').addEventListener('click', (e) => { const target = e.target.closest('button'); if (!target) return; if (target.dataset.tool) { currentTool = target.dataset.tool; document.querySelectorAll('#annotation-toolbar button[data-tool]').forEach(b => b.classList.remove('active')); target.classList.add('active'); currentPolylinePoints = []; redrawAnnotations(); textOptionsContainer.style.display = (currentTool === 'text') ? 'inline-flex' : 'none'; annotationCanvas.style.cursor = (currentTool === 'eraser') ? 'cell' : 'crosshair'; } if (target.id === 'clear-annotations') clearAnnotations(); if (target.id === 'undo-btn') handleUndo(); if (target.id === 'redo-btn') handleRedo(); });
+        annotationCanvas.addEventListener('mousedown', (e) => { startX = e.offsetX; startY = e.offsetY; isDrawing = true; const relX = startX / annotationCanvas.clientWidth; const relY = startY / annotationCanvas.clientHeight; if (currentTool === 'eraser') { annotationsToErase = []; return; } if (currentTool === 'text') { const text = prompt('Enter text:'); if (text) { addAnnotation({ type: 'text', text, x: relX, y: relY, fontSize: document.getElementById('font-size').value, color: document.getElementById('color-picker').value, bgColor: document.getElementById('text-bg-color').value, strokeEnabled: document.getElementById('text-stroke-toggle').checked, fillEnabled: document.getElementById('text-bg-toggle').checked }); } isDrawing = false; } else if (currentTool === 'pen' || currentTool === 'highlighter') { currentAnnotation = { type: currentTool, points: [{ x: relX, y: relY }], color: document.getElementById('color-picker').value, lineWidth: (currentTool === 'highlighter') ? 15 : 2, opacity: (currentTool === 'highlighter') ? 0.3 : 1.0 }; } else if (currentTool === 'cloud') { currentPolylinePoints.push({ x: relX, y: relY }); isDrawing = false; } });
+        annotationCanvas.addEventListener('mousemove', (e) => { if (currentTool === 'cloud' && currentPolylinePoints.length > 0) { redrawAnnotations(); annotationCtx.strokeStyle = document.getElementById('color-picker').value; annotationCtx.lineWidth = 2; annotationCtx.beginPath(); const w = annotationCanvas.width; const h = annotationCanvas.height; currentPolylinePoints.forEach((p, i) => { if (i === 0) annotationCtx.moveTo(p.x * w, p.y * h); else annotationCtx.lineTo(p.x * w, p.y * h); }); const mouseX = e.offsetX / annotationCanvas.clientWidth * w; const mouseY = e.offsetY / annotationCanvas.clientHeight * h; annotationCtx.lineTo(mouseX, mouseY); annotationCtx.stroke(); return; } if (!isDrawing) return; if (currentTool === 'eraser') { const currentAnns = annotations[pageNum] || []; currentAnns.forEach((annot, index) => { const bbox = getAnnotationBoundingBox(annot); if (e.offsetX >= bbox.x && e.offsetX <= bbox.x + bbox.w && e.offsetY >= bbox.y && e.offsetY <= bbox.y + bbox.h) { if (!annotationsToErase.includes(index)) annotationsToErase.push(index); } }); highlightEraserSelection(); return; } const x = e.offsetX / annotationCanvas.clientWidth; const y = e.offsetY / annotationCanvas.clientHeight; if (currentTool === 'pen' || currentTool === 'highlighter') { currentAnnotation.points.push({ x, y }); redrawAnnotations(); annotationCtx.strokeStyle = currentAnnotation.color; annotationCtx.lineWidth = currentAnnotation.lineWidth; annotationCtx.globalAlpha = currentAnnotation.opacity; annotationCtx.lineCap = 'round'; annotationCtx.beginPath(); const w = annotationCanvas.width; const h = annotationCanvas.height; currentAnnotation.points.forEach((p, i) => { if (i === 0) annotationCtx.moveTo(p.x * w, p.y * h); else annotationCtx.lineTo(p.x * w, p.y * h); }); annotationCtx.stroke(); annotationCtx.globalAlpha = 1.0; } });
+        annotationCanvas.addEventListener('mouseup', (e) => { if (!isDrawing) return; isDrawing = false; if (currentTool === 'eraser') { if (annotationsToErase.length > 0) { annotations[pageNum] = (annotations[pageNum] || []).filter((_, index) => !annotationsToErase.includes(index)); saveHistoryState(); redrawAnnotations(); } annotationsToErase = []; return; } const endX = e.offsetX / annotationCanvas.clientWidth; const endY = e.offsetY / annotationCanvas.clientHeight; const startRelX = startX / annotationCanvas.clientWidth; const startRelY = startY / annotationCanvas.clientHeight; let newAnnotation = null; const color = document.getElementById('color-picker').value; switch(currentTool) { case 'pen': case 'highlighter': newAnnotation = currentAnnotation; break; case 'rect': newAnnotation = { type: 'rect', x: Math.min(startRelX, endX), y: Math.min(startRelY, endY), w: Math.abs(endX - startRelX), h: Math.abs(endY - startRelY), color }; break; case 'circle': const radius = Math.sqrt(Math.pow(endX - startRelX, 2) + Math.pow(endY - startRelY, 2)); newAnnotation = { type: 'circle', x: startRelX, y: startRelY, r: radius, color }; break; case 'arrow': newAnnotation = { type: 'arrow', x1: startRelX, y1: startRelY, x2: endX, y2: endY, color }; break; } if (newAnnotation) addAnnotation(newAnnotation); currentAnnotation = null; });
+        annotationCanvas.addEventListener('dblclick', () => { if (currentTool === 'cloud' && currentPolylinePoints.length > 1) { currentPolylinePoints.push(currentPolylinePoints[0]); addAnnotation({ type: 'cloud', points: [...currentPolylinePoints], arcSize: document.getElementById('cloud-arc-size').value, color: document.getElementById('color-picker').value }); currentPolylinePoints = []; } });
+        
+        // Helper & Drawing Functions (Updated for new scaling)
+        function getAnnotationBoundingBox(annot) { const scale = annotationCanvas.clientWidth / originalWidth; const w = originalWidth; const h = originalHeight; let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity; const getPointsBounds = (points) => { points.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }); return { x: minX * w * scale, y: minY * h * scale, w: (maxX - minX) * w * scale, h: (maxY - minY) * h * scale }; }; switch(annot.type) { case 'pen': case 'highlighter': case 'cloud': return getPointsBounds(annot.points); case 'arrow': return getPointsBounds([{x: annot.x1, y: annot.y1}, {x: annot.x2, y: annot.y2}]); case 'rect': return { x: annot.x * w * scale, y: annot.y * h * scale, w: annot.w * w * scale, h: annot.h * h * scale }; case 'circle': return { x: (annot.x - annot.r) * w * scale, y: (annot.y - annot.r) * h * scale, w: (annot.r * 2) * w * scale, h: (annot.r * 2) * h * scale }; case 'text': annotationCtx.font = `${annot.fontSize}px Arial`; const metrics = annotationCtx.measureText(annot.text); const pad = 5; const boxW = metrics.width + 2 * pad; const boxH = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) + 2 * pad; return { x: ((annot.x * w) - pad) * scale, y: ((annot.y * h) - metrics.actualBoundingBoxAscent - pad) * scale, w: boxW * scale, h: boxH * scale }; default: return { x: 0, y: 0, w: 0, h: 0 }; } }
+        function highlightEraserSelection() { redrawAnnotations(); annotationCtx.fillStyle = 'rgba(255, 0, 0, 0.3)'; annotationsToErase.forEach(index => { const annot = (annotations[pageNum] || [])[index]; if (annot) { const bbox = getAnnotationBoundingBox(annot); const scale = annotationCanvas.clientWidth / originalWidth; annotationCtx.fillRect(bbox.x / scale, bbox.y / scale, bbox.w / scale, bbox.h / scale); } }); }
+        function drawArrow(fromx, fromy, tox, toy, ctx) { const headlen = 10; const dx = tox - fromx; const dy = toy - fromy; const angle = Math.atan2(dy, dx); ctx.beginPath(); ctx.moveTo(fromx, fromy); ctx.lineTo(tox, toy); ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6)); ctx.moveTo(tox, toy); ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); ctx.stroke(); }
+        function drawCloudFromPoints(points, arcSize, ctx) { if (points.length < 2) return; const w = annotationCanvas.width; const h = annotationCanvas.height; ctx.beginPath(); for (let i = 0; i < points.length - 1; i++) { const p1 = { x: points[i].x * w, y: points[i].y * h }; const p2 = { x: points[i+1].x * w, y: points[i+1].y * h }; const dx = p2.x - p1.x; const dy = p2.y - p1.y; const dist = Math.sqrt(dx * dx + dy * dy); const angle = Math.atan2(dy, dx); for (let d = 0; d < dist; d += arcSize) { const x = p1.x + Math.cos(angle) * d; const y = p1.y + Math.sin(angle) * d; ctx.arc(x, y, arcSize / 2, angle - Math.PI / 2, angle + Math.PI / 2); } } ctx.stroke(); }
+        
+        // Modal Control & Finalization - Unchanged
+        closeBtn.onclick = () => { modal.style.display = 'none'; currentItem = null; pdfDoc = null; window.removeEventListener('resize', resizeAnnotationCanvas); };
+        window.onclick = (e) => { if (e.target == modal) closeBtn.onclick(); };
+        window.addEventListener('resize', resizeAnnotationCanvas);
+        document.getElementById('prev-page').addEventListener('click', () => { if (pageNum > 1) renderPdfPage(pageNum - 1); });
+        document.getElementById('next-page').addEventListener('click', () => { if (pdfDoc && pageNum < pdfDoc.numPages) renderPdfPage(pageNum + 1); });
+        document.getElementById('download-btn').addEventListener('click', () => { const tempCanvas = document.createElement('canvas'); const tempCtx = tempCanvas.getContext('2d'); const media = currentItem.type.startsWith('image/') ? modalImg : pdfCanvas; tempCanvas.width = originalWidth; tempCanvas.height = originalHeight; tempCtx.drawImage(media, 0, 0, originalWidth, originalHeight); const originalStyleW = annotationCanvas.style.width; const originalStyleH = annotationCanvas.style.height; annotationCanvas.width = originalWidth; annotationCanvas.height = originalHeight; annotationCanvas.style.width = originalWidth + 'px'; annotationCanvas.style.height = originalHeight + 'px'; redrawAnnotations(); tempCtx.drawImage(annotationCanvas, 0, 0); annotationCanvas.style.width = originalStyleW; annotationCanvas.style.height = originalStyleH; resizeAnnotationCanvas(); const link = document.createElement('a'); link.download = `annotated-${currentItem.name.split('.').slice(0, -1).join('.')}.png`; link.href = tempCanvas.toDataURL('image/png'); link.click(); });
+        document.addEventListener('keydown', (e) => { if (modal.style.display === 'block') { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); handleUndo(); } if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); handleRedo(); } } });
+        document.getElementById('tool-pen').classList.add('active'); updateHistoryButtons();
+        
+    </script>
+</body>
+</html>
