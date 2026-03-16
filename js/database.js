@@ -781,8 +781,9 @@
         return publicAPI.add(STORES.FILES, normalized);
     }
 
-    async function hydrateFileRecord(file) {
+    async function hydrateFileRecord(file, shouldHydrate = true) {
         if (!file) return file;
+        if (!shouldHydrate) return file;
         if (file.dataUrl) return file;
         if (!DriveSync.isEnabled() || !file.driveFileId) return file;
 
@@ -1083,19 +1084,19 @@
         // --- Unified File Methods ---
         addFile: (fileData) => persistFileRecord(fileData),
         deleteFile: (id) => removeFileRecord(id),
-        getFileById: async (id) => {
+        getFileById: async (id, skipHydration = false) => {
             const file = await publicAPI.get(STORES.FILES, id);
-            return hydrateFileRecord(file);
+            return hydrateFileRecord(file, !skipHydration);
         },
-        // --- FIX: Corrected getFiles to handle null jobNo ---
-        getFiles: async (jobNo, source) => {
+        // --- FIX: Corrected getFiles to handle null jobNo + lazy hydration ---
+        getFiles: async (jobNo, source, skipHydration = false) => {
             // If source is omitted, return all files for the job.
             if (typeof source === 'undefined' || source === null) {
                 const allFiles = await publicAPI.getAll(STORES.FILES);
                 const filteredByJob = (jobNo === null || typeof jobNo === 'undefined')
                     ? allFiles
                     : allFiles.filter(file => file.jobNo === jobNo);
-                return Promise.all(filteredByJob.map(hydrateFileRecord));
+                return Promise.all(filteredByJob.map(file => hydrateFileRecord(file, !skipHydration)));
             }
 
             // If jobNo is null/undefined, we can't use the compound index to query only by 'source'.
@@ -1103,19 +1104,19 @@
             if (jobNo === null || typeof jobNo === 'undefined') {
                 const allFiles = await publicAPI.getAll(STORES.FILES);
                 const filtered = allFiles.filter(file => file.source === source);
-                return Promise.all(filtered.map(hydrateFileRecord));
+                return Promise.all(filtered.map(file => hydrateFileRecord(file, !skipHydration)));
             }
             // For provider portability, filter in JS instead of relying on IndexedDB indexes.
             const files = (await publicAPI.getAll(STORES.FILES)).filter(file => file.jobNo === jobNo && file.source === source);
-            return Promise.all(files.map(hydrateFileRecord));
+            return Promise.all(files.map(file => hydrateFileRecord(file, !skipHydration)));
         },
-        getFilesByCategory: (jobNo, source, category) => {
-            return publicAPI.getFiles(jobNo, source)
+        getFilesByCategory: (jobNo, source, category, skipHydration = false) => {
+            return publicAPI.getFiles(jobNo, source, skipHydration)
                 .then(files => files.filter(file => file.category === category));
         },
-        getAllFiles: async () => {
+        getAllFiles: async (skipHydration = false) => {
             const files = await publicAPI.getAll(STORES.FILES);
-            return Promise.all(files.map(hydrateFileRecord));
+            return Promise.all(files.map(file => hydrateFileRecord(file, !skipHydration)));
         },
         clearFilesBySource: async (jobNo, source) => {
             const files = await publicAPI.getFiles(jobNo, source);
