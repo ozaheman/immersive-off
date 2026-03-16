@@ -228,7 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const allSiteData = await DB.getAllSiteData();
         const siteDataMap = new Map(allSiteData.map(data => [data.jobNo, data]));
 
-        await updateDashboardSummary(allProjects);
+        // Defer non-critical summary calculations to happen after rendering
+        updateDashboardSummary(allProjects).catch(err => console.error('Dashboard summary update error:', err));
 
         const tbody = App.DOMElements['project-list-body'];
         tbody.innerHTML = '';
@@ -246,7 +247,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return searchWords.every(word => projectDataToSearch.includes(word));
         });
 
-        for (const p of filteredProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo))) {
+        // Pre-fetch all scrum data in parallel
+        const scrumDataMap = new Map();
+        const sortedProjects = filteredProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
+        const scrumPromises = sortedProjects.map(async p => {
+            const scrumData = await DB.getScrumData(p.jobNo);
+            scrumDataMap.set(p.jobNo, scrumData);
+        });
+        await Promise.all(scrumPromises);
+
+        // Pre-fetch all master files in parallel (without hydration)
+        const filesMap = new Map();
+        const filePromises = sortedProjects.map(async p => {
+            const masterFiles = await DB.getFiles(p.jobNo, 'master', true);
+            filesMap.set(p.jobNo, masterFiles);
+        });
+        await Promise.all(filePromises);
+
+        for (const p of sortedProjects) {
             const row = tbody.insertRow();
             row.dataset.jobNo = p.jobNo;
             const siteData = siteDataMap.get(p.jobNo) || {};
@@ -256,12 +274,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const officeStatusClass = (p.projectStatus || 'pending').toLowerCase().replace(/ /g, '-');
             const siteStatusClass = siteStatus.toLowerCase().replace(/ /g, '-');
 
-            const scrumData = await DB.getScrumData(p.jobNo);
+            const scrumData = scrumDataMap.get(p.jobNo);
             const scrumProgressHtml = generateScrumProgressBarHtml(scrumData);
 
             const statusHtml = `<div>Office: <span class="status-${officeStatusClass}">${p.projectStatus || 'Pending'}</span></div> <div style="margin-top:4px;">Site: <span class="status-${siteStatusClass}">${siteStatus}</span></div> <div class="progress-bar-container" style="height:14px; margin-top:4px;"><div class="progress-bar" style="width:${progress}%; height:14px; font-size:0.7em;">${progress}%</div></div>${scrumProgressHtml}`;
 
-            const masterFiles = await DB.getFiles(p.jobNo, 'master');
+            const masterFiles = filesMap.get(p.jobNo) || [];
             const affectionPlanFile = masterFiles.find(f => f.subCategory === 'affection_plan');
             const docHtml = affectionPlanFile ? `<a href="#" class="file-link" data-file-id="${affectionPlanFile.id}">Affection Plan</a>` : `<span class="file-link not-available">Affection Plan</span>`;
 
@@ -321,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         App.DOMElements['last-paid-amount'].textContent = lastPaidInvoice ? ` ${App.formatCurrency(lastPaidInvoice.paymentDetails.amountPaid)}` : 'N/A';
         App.DOMElements['on-hold-amount'].textContent = ` ${App.formatCurrency(totalOnHoldAmount)}`;
 
-        const allMasterFiles = await DB.getAllFiles('master');
+        const allMasterFiles = await DB.getAllFiles(true);
         const now = new Date();
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(now.getDate() + 30);

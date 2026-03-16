@@ -4,7 +4,8 @@ const dotenv = require('dotenv');
 const { createAdapterFromEnv } = require('./db');
 const { parseKey, getStoreMeta } = require('./db/storeConfig');
 
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// Load .env file for local development, but don't fail on Vercel where env vars are set in dashboard
+dotenv.config({ path: path.join(__dirname, '..', '.env'), override: false });
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
