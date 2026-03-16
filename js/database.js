@@ -80,35 +80,44 @@
     }
 
     async function ensureRuntimeEnvLoaded() {
-        if (window.__ENV__ && Object.keys(window.__ENV__).length > 0) return;
+        if (window.__ENV__ && Object.keys(window.__ENV__).length > 0) {
+            console.log('[DB] Environment already loaded:', Object.keys(window.__ENV__));
+            return;
+        }
         if (envLoadPromise) return envLoadPromise;
 
         envLoadPromise = (async () => {
-            // 1) Preferred source: backend runtime config endpoint.
+            // Load config from backend API endpoint (only secure source for environment variables)
             try {
+                console.log('[DB] 🔄 Loading runtime configuration from /api/config...');
                 const cfgRes = await fetch('/api/config', { cache: 'no-store' });
-                if (cfgRes.ok) {
-                    const cfg = await cfgRes.json();
-                    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length > 0) {
-                        window.__ENV__ = { ...(window.__ENV__ || {}), ...cfg };
-                        return;
-                    }
+                
+                if (!cfgRes.ok) {
+                    console.error('[DB] ❌ Failed to load config: Server returned status', cfgRes.status);
+                    throw new Error(`HTTP ${cfgRes.status}`);
                 }
-            } catch (error) {
-                // Intentionally continue to .env fallback for static-only local usage.
-            }
-
-            // 2) Fallback source: .env file (works only when server allows dotfiles).
-            try {
-                const response = await fetch('.env', { cache: 'no-store' });
-                if (!response.ok) return;
-                const text = await response.text();
-                const parsed = parseDotEnv(text);
-                if (Object.keys(parsed).length > 0) {
-                    window.__ENV__ = { ...(window.__ENV__ || {}), ...parsed };
+                
+                const cfg = await cfgRes.json();
+                if (!cfg || typeof cfg !== 'object' || Object.keys(cfg).length === 0) {
+                    console.error('[DB] ❌ Config endpoint returned empty or invalid response:', cfg);
+                    throw new Error('Empty config response');
                 }
+                
+                window.__ENV__ = { ...(window.__ENV__ || {}), ...cfg };
+                console.log('[DB] ✅ Runtime config loaded successfully. Keys:', Object.keys(cfg).join(', '));
+                console.log('[DB] Config values:', {
+                    DB_PROVIDER: cfg.DB_PROVIDER,
+                    DB_API_BASE_URL: cfg.DB_API_BASE_URL,
+                    GOOGLE_DRIVE_ENABLED: cfg.GOOGLE_DRIVE_ENABLED,
+                    GOOGLE_DRIVE_ROOT_FOLDER: cfg.GOOGLE_DRIVE_ROOT_FOLDER
+                });
             } catch (error) {
-                console.warn('Could not load .env at runtime. Falling back to existing window.__ENV__ or meta tags.', error);
+                console.error('[DB] ❌ CRITICAL: Could not load runtime config from /api/config:', error.message);
+                console.error('[DB] ⚠️ App will not function properly without config. Check:');
+                console.error('[DB]    1. Server is running (curl http://localhost:8080/api/health)');
+                console.error('[DB]    2. PORT environment variable (default: 8080)');
+                console.error('[DB]    3. .env file exists and contains DB_PROVIDER and other required vars');
+                window.__ENV__ = {};
             }
         })();
 
@@ -118,14 +127,21 @@
     function getEnvValue(key, fallback = '') {
         const fromWindowEnv = window.__ENV__ && window.__ENV__[key];
         if (typeof fromWindowEnv !== 'undefined' && fromWindowEnv !== null && String(fromWindowEnv).trim() !== '') {
+            console.log(`[DB] ✓ Config "${key}" = "${String(fromWindowEnv).trim()}"`);
             return String(fromWindowEnv).trim();
         }
 
         const fromMeta = document.querySelector(`meta[name="${key}"]`)?.getAttribute('content');
         if (fromMeta && String(fromMeta).trim() !== '') {
+            console.log(`[DB] ✓ Config "${key}" found in <meta> tag = "${String(fromMeta).trim()}"`);
             return String(fromMeta).trim();
         }
 
+        if (fallback) {
+            console.log(`[DB] ⚠️ Config "${key}" not found, using fallback = "${fallback}"`);
+        } else {
+            console.warn(`[DB] ❌ Config "${key}" not found and no fallback provided`);
+        }
         return fallback;
     }
 
@@ -584,28 +600,36 @@
         return new Promise((resolve, reject) => {
             const openDatabase = () => {
                 activeDbProvider = getDbProvider();
+                console.log('[DB] Initializing database with provider:', activeDbProvider);
 
                 if (isRemoteProvider()) {
+                    console.log('[DB] Using remote provider. Checking health at /health...');
                     remoteDbRequest('GET', '/health')
-                        .then(async () => {
+                        .then(async (healthData) => {
+                            console.log('[DB] ✅ Remote DB health check passed:', healthData);
                             if (typeof window.FINANCIAL_DATA !== 'undefined') {
+                                console.log('[DB] Seeding financial templates...');
                                 await seedFinancialTemplates();
                             }
                             resolve();
                         })
-                        .catch(reject);
+                        .catch((err) => {
+                            console.error('[DB] ❌ Remote DB health check failed:', err.message);
+                            reject(err);
+                        });
                     return;
                 }
 
-                console.log(`Opening database ${DB_NAME} version ${DB_VERSION}...`);
+                console.log(`[DB] Opening IndexedDB: ${DB_NAME} v${DB_VERSION}...`);
                 const request = indexedDB.open(DB_NAME, DB_VERSION);
 
                 request.onerror = (event) => {
-                    console.error("Database error:", event.target.error);
+                    console.error("[DB] ❌ IndexedDB error:", event.target.error);
                     reject(event.target.error);
                 };
 
                 request.onupgradeneeded = (event) => {
+                    console.log('[DB] onupgradeneeded triggered - creating stores...');
                     db = event.target.result;
                     const createStore = (name, options, indices = []) => {
                         if (!db.objectStoreNames.contains(name)) {
@@ -642,18 +666,22 @@
                     createStore(STORES.RECIPIENT_HISTORY, { keyPath: 'id', autoIncrement: true }, [
                         { name: 'by_name', keyPath: 'name', unique: true }
                     ]);
+                    console.log('[DB] Stores created');
                 };
 
                 request.onsuccess = async (event) => {
                     db = event.target.result;
+                    console.log('[DB] ✅ IndexedDB opened successfully');
                     // If Financial Data exists globally, seed it
                     if (typeof window.FINANCIAL_DATA !== 'undefined') {
+                        console.log('[DB] Seeding financial templates...');
                         await seedFinancialTemplates();
                     }
                     resolve();
                 };
             };
 
+            console.log('[DB] init() called - loading environment...');
             ensureRuntimeEnvLoaded().finally(openDatabase);
         });
     }
