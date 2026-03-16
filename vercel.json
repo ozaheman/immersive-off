@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm install",
+  "buildCommand": "",
+  "outputDirectory": ".",
   "env": {
     "PORT": "3000",
     "NODE_ENV": "production",
