@@ -5,21 +5,5 @@
     "PORT": "3000",
     "NODE_ENV": "production",
     "DB_API_BASE_URL": "/api"
-  },
-  "functions": {
-    "server/index.js": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "server/index.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
-    }
-  ]
+  }
 }
