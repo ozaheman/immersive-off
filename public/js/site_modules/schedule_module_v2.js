@@ -1,5 +1,5 @@
 /* START OF FILE js/site_modules/schedule_module.js */
-import { AppState } from '/js/site_index.js';
+
 
 // let DOMElements = {};
 export const ScheduleModule = {
@@ -47,10 +47,10 @@ export const ScheduleModule = {
         // Only filter if not 'all'. 
         // Note: Tasks from the default template might not have a 'floor' property set.
         // Those will disappear when a specific floor is selected, which is expected behavior.
-        if (AppState.currentFloorFilter && AppState.currentFloorFilter !== 'all')
+        if (window.AppState.currentFloorFilter && window.AppState.currentFloorFilter !== 'all')
  {
-     //alert(AppState.currentFloorFilter);
-            filteredSchedule = fullSchedule.filter(t => t.floor === AppState.currentFloorFilter);
+     //alert(window.AppState.currentFloorFilter);
+            filteredSchedule = fullSchedule.filter(t => t.floor === window.AppState.currentFloorFilter);
         }
         // --- FILTERING LOGIC END ---
 
@@ -230,7 +230,7 @@ export function renderFloorSelector() {
     containers.forEach(container => {
         let html = '';
         floors.forEach(f => {
-            const active = AppState.currentFloorFilter === f.id ? 'active' : '';
+            const active = window.AppState.currentFloorFilter === f.id ? 'active' : '';
             html += `<button class="floor-btn ${active}" data-floor="${f.id}">${f.label}</button>`;
         });
         container.innerHTML = html;
@@ -251,7 +251,7 @@ export function renderFloorSelectorxx() {
     ];
     let html = '';
     floors.forEach(f => {
-        const active = AppState.currentFloorFilter === f.id ? 'active' : '';
+        const active = window.AppState.currentFloorFilter === f.id ? 'active' : '';
         html += `<button class="floor-btn ${active}" data-floor="${f.id}">${f.label}</button>`;
     });
     if(DOMElements.floorSelectorContainer){
@@ -262,7 +262,7 @@ DOMElements.floorSelectorContainer.innerHTML = html;
 }
 
 export async function showNewTaskModal() {
-    if(!AppState.currentJobNo) return alert("Select a project first.");
+    if(!window.AppState.currentJobNo) return alert("Select a project first.");
     // alert('fffff1');
     // FIX: Check if Schedule Library is loaded before using it
     if (!window.UrbanAxisSchedule) {
@@ -275,8 +275,8 @@ export async function showNewTaskModal() {
     if (DOMElements.newTaskDependency) {
          // alert('fffff4');
         DOMElements.newTaskDependency.innerHTML = '<option value="">-- No Dependency --</option>';
-        const project = await window.DB.getProject(AppState.currentJobNo);
-        const siteData = await window.DB.getSiteData(AppState.currentJobNo);
+        const project = await window.DB.getProject(window.AppState.currentJobNo);
+        const siteData = await window.DB.getSiteData(window.AppState.currentJobNo);
          // FIX: Ensure array here too
         if (!Array.isArray(siteData.scheduleOverrides)) siteData.scheduleOverrides = [];
         const template = window.VILLA_SCHEDULE_TEMPLATE || [];
@@ -298,7 +298,7 @@ export async function saveNewTask() {
     
     if(!name) return alert("Task Name is required");
 
-    const siteData = await window.DB.getSiteData(AppState.currentJobNo);
+    const siteData = await window.DB.getSiteData(window.AppState.currentJobNo);
     // alert('siteData');
      // alert(siteData);
     if(!siteData.customTasks) siteData.customTasks = [];
@@ -317,7 +317,7 @@ export async function saveNewTask() {
     await window.DB.putSiteData(siteData);
     
     if(DOMElements.newTaskModal) DOMElements.newTaskModal.style.display = 'none';
-    ScheduleModule.render(AppState.currentJobNo);
+    ScheduleModule.render(window.AppState.currentJobNo);
 }
 
 // --- GANTT & BIM ---
@@ -392,17 +392,17 @@ export async function saveNewTask() {
         slider.oninput = updateViz;
 
         playBtn.onclick = () => {
-            if (AppState.simulationInterval) {
-                clearInterval(AppState.simulationInterval);
-                AppState.simulationInterval = null;
+            if (window.AppState.simulationInterval) {
+                clearInterval(window.AppState.simulationInterval);
+                window.AppState.simulationInterval = null;
                 playBtn.textContent = "▶ Play Simulation";
             } else {
                 playBtn.textContent = "⏸ Pause";
-                AppState.simulationInterval = setInterval(() => {
+                window.AppState.simulationInterval = setInterval(() => {
                     let val = parseInt(slider.value);
                     if (val >= slider.max) {
-                        clearInterval(AppState.simulationInterval);
-                        AppState.simulationInterval = null;
+                        clearInterval(window.AppState.simulationInterval);
+                        window.AppState.simulationInterval = null;
                         playBtn.textContent = "▶ Play Simulation";
                     } else {
                         slider.value = val + 1;
@@ -442,18 +442,18 @@ export async function saveNewTask() {
     }
   
 export async function renderGanttChart() {
-        if (!AppState.currentJobNo || !window.UrbanAxisSchedule) return;
+        if (!window.AppState.currentJobNo || !window.UrbanAxisSchedule) return;
         // alert('fffr1');
-        const project = await window.DB.getProject(AppState.currentJobNo);
-        const siteData = await window.DB.getSiteData(AppState.currentJobNo);
+        const project = await window.DB.getProject(window.AppState.currentJobNo);
+        const siteData = await window.DB.getSiteData(window.AppState.currentJobNo);
         
         // 1. Get Full Schedule (Template + Custom)
         let finalSchedule = await getProjectSchedule(project, siteData);
 console.log('finalSchedule');
 console.log(finalSchedule);
         // 2. Apply Floor Filter
-        if(AppState.currentFloorFilter !== 'all') {
-            finalSchedule = finalSchedule.filter(t => t.floor === AppState.currentFloorFilter || (t.floor === undefined && AppState.currentFloorFilter === 'sub')); 
+        if(window.AppState.currentFloorFilter !== 'all') {
+            finalSchedule = finalSchedule.filter(t => t.floor === window.AppState.currentFloorFilter || (t.floor === undefined && window.AppState.currentFloorFilter === 'sub')); 
         }
 
         // 3. Set Global Data for BIM
@@ -473,7 +473,7 @@ console.log(finalSchedule);
         //{
             BIMViewer.init('bim-viewer-container', project.projectType || 'Villa');
             // Filter BIM view? For now we show full model, but Gantt focuses on specific floor.
-            // Could add BIMViewer.setFilter(AppState.currentFloorFilter);
+            // Could add BIMViewer.setFilter(window.AppState.currentFloorFilter);
             setupSimulationControls(window.currentScheduleData);
         //}
     }

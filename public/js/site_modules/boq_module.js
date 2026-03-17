@@ -1,4 +1,3 @@
-import { BulletinModule } from './bulletin_module.js';
 export const BoqModule = {
     init: (domElements, context) => {
         const boqTab = document.getElementById('boq-tab');
