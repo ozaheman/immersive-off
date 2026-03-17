@@ -236,11 +236,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.DB) {
             await window.DB.init();
             // MODIFICATION: Load tab visibility settings from DB
-            const tabSettings = await window.DB.getSetting('site_tab_visibility');
-            if (tabSettings && tabSettings.config) {
-                console.log("Loaded custom site tab visibility settings from DB.");
-                ROLE_TABS = tabSettings.config;
-            } else {
+            try {
+                const tabSettings = await window.DB.getSetting('site_tab_visibility');
+                if (tabSettings && tabSettings.config) {
+                    console.log("Loaded custom site tab visibility settings from DB.");
+                    ROLE_TABS = tabSettings.config;
+                } else {
+                    console.log("Using default site tab visibility settings.");
+                }
+            } catch (settingsError) {
+                console.warn("Could not load site tab visibility settings:", settingsError);
                 console.log("Using default site tab visibility settings.");
             }
             await populateHolidayCountries();
@@ -977,9 +982,14 @@ async function authenticateUser(role, username, password) {
     }
     if (accessibleProjects.length > 0) return { success: true, accessibleProjects };
 
-    const settings = await window.DB.getSetting('access_control');
-    if (settings?.credentials?.[role]?.user === username && settings?.credentials?.[role]?.pass === password) {
-        return { success: true, accessibleProjects: [] }; // Empty means all
+    try {
+        const settings = await window.DB.getSetting('access_control');
+        if (settings?.credentials?.[role]?.user === username && settings?.credentials?.[role]?.pass === password) {
+            return { success: true, accessibleProjects: [] }; // Empty means all
+        }
+    } catch (error) {
+        console.warn("Could not load access_control settings:", error);
+        // Continue to return false if settings not found
     }
 
     return { success: false, accessibleProjects: [] };
