@@ -25,6 +25,8 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/config', (_req, res) => {
   // Only expose non-secret runtime config needed by browser code.
+  console.log("In API CONFIG::",process.env.DB_PROVIDER);
+  
   res.json({
     DB_PROVIDER: process.env.DB_PROVIDER || 'indexeddb',
     DB_API_BASE_URL: process.env.DB_API_BASE_URL || '/api',
