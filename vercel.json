@@ -1,10 +1,25 @@
 {
   "version": 2,
-  "buildCommand": "",
-  "outputDirectory": ".",
+  "builds": [
+    {
+      "src": "server/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "nodeVersion": "20.x"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server/index.js"
+    }
+  ],
   "env": {
-    "PORT": "3000",
-    "NODE_ENV": "production",
-    "DB_API_BASE_URL": "/api"
+    "NODE_ENV": "production"
   }
 }
