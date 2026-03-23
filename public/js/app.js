@@ -247,9 +247,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return searchWords.every(word => projectDataToSearch.includes(word));
         });
 
+        // Filter archived projects based on toggle state
+        const showArchived = App.DOMElements['show-archived-toggle']?.checked || false;
+        const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
+
         // Pre-fetch all scrum data in parallel
         const scrumDataMap = new Map();
-        const sortedProjects = filteredProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
+        const sortedProjects = displayedProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
         const scrumPromises = sortedProjects.map(async p => {
             const scrumData = await DB.getScrumData(p.jobNo);
             scrumDataMap.set(p.jobNo, scrumData);
@@ -267,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const p of sortedProjects) {
             const row = tbody.insertRow();
             row.dataset.jobNo = p.jobNo;
+            row.className = p.archived ? 'archived-row' : '';
             const siteData = siteDataMap.get(p.jobNo) || {};
             const siteStatus = siteData.status || 'N/A';
             const progress = siteData.progress || 0;
@@ -286,10 +291,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const invoicesToDisplay = App.showAllInvoices ? (p.invoices || []) : (p.invoices || []).filter(inv => inv.status === 'Raised' || inv.status === 'Pending');
             const invoiceDetailsHtml = invoicesToDisplay.length > 0 ? invoicesToDisplay.map(inv => `<div class="invoice-row status-${(inv.status || '').toLowerCase()}"><span><b>${inv.no}</b></span><span>${inv.date}</span><span style="font-weight:bold; text-align:right;">${App.formatCurrency(parseFloat(inv.total || 0))}</span><span>(${inv.status})</span></div>`).join('') : (App.showAllInvoices ? 'No invoices' : 'No pending invoices');
 
+            const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
+
             let actionsHtml = `<button class="edit-btn">View/Edit</button>`;
             if (p.projectStatus === 'Under Supervision') {
                 actionsHtml += `<button class="bill-monthly-btn secondary-button" data-job-no="${p.jobNo}">+ Monthly Inv</button>`;
             }
+            actionsHtml += `<button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}" style="margin-left: 5px;">
+                ${p.archived ? '↻ Unarchive' : '📦 Archive'}
+            </button>`;
+            actionsHtml += `<button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete" style="margin-left: 5px;">
+                🗑️ Delete
+            </button>`;
+            actionsHtml += archivedBadge;
 
             row.innerHTML = `<td><b>${p.jobNo}</b><br><small style="color:#666">(${revNo})</small></td><td>${p.clientName}<br><small>${p.clientMobile || ''}</small></td><td>${p.plotNo}<br><small><b>${p.projectType || 'N/A'}</b> / ${p.agreementDate || ''}</small></td><td>${statusHtml}</td><td>${docHtml}</td><td><div class="invoice-container">${invoiceDetailsHtml}</div></td><td>${actionsHtml}</td>`;
         }
@@ -1087,11 +1101,11 @@ document.addEventListener('DOMContentLoaded', () => {
             App.DOMElements['toggle-invoices-btn'].textContent = App.showAllInvoices ? 'Show Pending Invoices' : 'Show All Invoices';
             renderDashboard();
         });
-
+        App.DOMElements['show-archived-toggle']?.addEventListener('change', renderDashboard);
 
         App.DOMElements['project-list-body']?.addEventListener('click', async (e) => {
             const row = e.target.closest('tr');
-            if (!row?.dataset?.jobNo && !e.target.matches('.bill-monthly-btn')) return;
+            if (!row?.dataset?.jobNo && !e.target.matches('.bill-monthly-btn') && !e.target.matches('.archive-btn') && !e.target.matches('.delete-btn')) return;
 
             if (e.target.matches('.edit-btn')) handleEditProject(row.dataset.jobNo);
             else if (e.target.matches('.file-link:not(.not-available)')) {
@@ -1103,6 +1117,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const jobNo = e.target.dataset.jobNo;
                 handleQuickBillMonthly(jobNo);
+            } else if (e.target.matches('.archive-btn')) {
+                e.stopPropagation();
+                const jobNo = e.target.dataset.jobNo;
+                handleArchiveProject(jobNo);
+            } else if (e.target.matches('.delete-btn')) {
+                e.stopPropagation();
+                const jobNo = e.target.dataset.jobNo;
+                showDeleteConfirmationModal(jobNo);
             }
         });
         App.DOMElements['dash-cal-prev-btn']?.addEventListener('click', () => DashboardCalendar.changeMonth(-1));
@@ -1140,12 +1162,157 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
+    // Handle archiving/unarchiving a project
+    async function handleArchiveProject(jobNo) {
+        const project = await DB.getProject(jobNo);
+        if (!project) {
+            alert('Project not found');
+            return;
+        }
+
+        const isArchived = project.archived || false;
+        const action = isArchived ? 'Unarchive' : 'Archive';
+
+        showArchiveConfirmationModal(jobNo, action, async () => {
+            project.archived = !isArchived;
+            await DB.putProject(project);
+            await renderDashboard();
+            Bulletin.log('Project ' + action, `Project <strong>${jobNo}</strong> has been ${action.toLowerCase()}d.`);
+            alert(`Project ${action.toLowerCase()}d successfully!`);
+        });
+    }
+
+    // Show archive confirmation modal
+    function showArchiveConfirmationModal(jobNo, action, onConfirm) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center;">
+                <h2 style="margin-top: 0; color: #333;">${action} Project?</h2>
+                <p style="color: #666; margin: 15px 0;">
+                    ${action === 'Archive' ? 'This project will be hidden from the main list. You can show archived projects using the toggle.' : 'This project will be visible in the main list again.'}
+                </p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="confirm-btn" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ${action}
+                    </button>
+                    <button id="cancel-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#confirm-btn').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            onConfirm();
+        });
+
+        modal.querySelector('#cancel-btn').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+    }
+
+    // Show delete confirmation modal
+    function showDeleteConfirmationModal(jobNo) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center;">
+                <h2 style="margin-top: 0; color: #d9534f;">⚠️ Delete Project?</h2>
+                <p style="color: #666; margin: 15px 0;">
+                    This action cannot be undone. To confirm deletion, please type the project ID:
+                </p>
+                <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold; font-family: monospace; color: #333;">
+                    ${jobNo}
+                </p>
+                <input
+                    type="text"
+                    id="delete-confirm-input"
+                    placeholder="Type project ID to confirm"
+                    style="width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: monospace;"
+                />
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="confirm-delete-btn" style="padding: 10px 20px; background: #d9534f; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Delete
+                    </button>
+                    <button id="cancel-delete-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const confirmBtn = modal.querySelector('#confirm-delete-btn');
+        const cancelBtn = modal.querySelector('#cancel-delete-btn');
+        const input = modal.querySelector('#delete-confirm-input');
+
+        confirmBtn.addEventListener('click', async () => {
+            if (input.value === jobNo) {
+                document.body.removeChild(modal);
+                await handleDeleteProject(jobNo);
+            } else {
+                alert('Project ID does not match. Deletion cancelled.');
+                document.body.removeChild(modal);
+            }
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        input.focus();
+    }
+
+    // Handle permanent deletion of a project
+    async function handleDeleteProject(jobNo) {
+        try {
+            await DB.delete('projects', jobNo);
+            // Also delete associated site data
+            await DB.delete('siteData', jobNo);
+            await renderDashboard();
+            Bulletin.log('Project Deleted', `Project <strong>${jobNo}</strong> has been permanently deleted.`);
+            alert('Project deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            alert('Error deleting project. Please try again.');
+        }
+    }
     function cacheDOMElements() {
         const ids = [
             'app-container', 'dashboard-view', 'project-view', 'resizer',
             'design-studio-btn',
             'vendor-master-search', 'vendor-search-results-body', 'project-vendor-list-body',
-            'new-project-btn', 'search-box', 'new-sample-project-btn', 'project-list-body', 'load-from-file-btn', 'save-to-file-btn', 'xml-file-input', 'load-site-update-btn', 'site-update-file-input', 'toggle-invoices-btn',
+            'new-project-btn', 'search-box', 'new-sample-project-btn', 'project-list-body', 'load-from-file-btn', 'save-to-file-btn', 'xml-file-input', 'load-site-update-btn', 'site-update-file-input', 'toggle-invoices-btn', 'show-archived-toggle',
             'pending-invoices-summary', 'pending-invoices-count', 'pending-invoices-amount', 'last-paid-amount', 'on-hold-amount', 'expiring-documents-summary', 'expiring-documents-count',
             'back-to-dashboard-btn', 'save-project-btn', 'create-revision-btn', 'project-view-title', 'page-size-selector', 'generate-pdf-btn',
             'main-tab', 'scope-tab', 'fees-tab', 'invoicing-tab', 'swimming-pool-tab', // MODIFICATION: Add new tab ID

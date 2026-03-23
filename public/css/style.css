@@ -908,3 +908,63 @@ button:hover {
     background: #d1ecf1;
     color: #0c5460;
 }
+/* Archive/Delete Project Features */
+.action-btn {
+    padding: 6px 12px;
+    margin: 0 4px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    white-space: nowrap;
+    background: #f8f9fa;
+    color: #333;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.action-btn.archive-btn:hover {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.action-btn.delete-btn:hover {
+    background: #f8d7da;
+    border-color: #d9534f;
+}
+
+.archived-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #d9534f;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.archived-row {
+    opacity: 0.65;
+    background: #f8f9fa;
+}
+
+.archived-row:hover {
+    background: #e9ecef;
+}
+
+#show-archived-toggle {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    margin-right: 4px;
+}
+
+#show-archived-toggle:hover {
+    opacity: 0.8;
+}

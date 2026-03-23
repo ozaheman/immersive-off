@@ -1,6 +1,7 @@
 //--- START OF FILE js/sample_projects.js ---
 const SAMPLE_PROJECT_TEMPLATES = {
     "Villa": {
+        "archived": false,
         "projectStatus": "In Progress",
         "clientName": "Mr. Sample Client",
         "clientMobile": "+971 50 123 4567",

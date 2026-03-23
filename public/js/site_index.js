@@ -813,6 +813,9 @@ function setupCoreEventListeners() {
     DOMElements.backToGlobalBtn.addEventListener('click', showGlobalView);
     DOMElements.controlTabsContainer.addEventListener('click', handleTabClick);
 
+    // Archive/Delete project controls
+    document.getElementById('show-archived-toggle')?.addEventListener('change', renderProjectList);
+
     // FIX 3: Event listener for share button
     document.getElementById('save-data-btn')?.addEventListener('click', handleSaveAndShare);
 
@@ -1122,10 +1125,196 @@ async function renderProjectList() {
         ? allProjects.filter(p => AppState.accessibleProjects.includes(p.jobNo))
         : allProjects;
 
-    DOMElements.projectListBody.innerHTML = filteredProjects.map(p => {
+    // Filter archived projects based on toggle state
+    const showArchived = document.getElementById('show-archived-toggle')?.checked || false;
+    const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
+
+    DOMElements.projectListBody.innerHTML = displayedProjects.map(p => {
         let siteData = siteDataMap.get(p.jobNo) || { status: 'Pending Start', progress: 0 };
-        return `<tr data-job-no="${p.jobNo}"><td>${p.jobNo}</td><td>${p.projectDescription}<br><small>${p.clientName}</small></td><td>${p.plotNo}</td><td>${siteData.status} (${siteData.progress || 0}%)</td></tr>`;
-    }).join('') || '<tr><td colspan="4">No projects accessible.</td></tr>';
+        const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
+        return `<tr data-job-no="${p.jobNo}" class="${p.archived ? 'archived-row' : ''}">
+            <td>${p.jobNo}</td>
+            <td>${p.projectDescription}<br><small>${p.clientName}</small></td>
+            <td>${p.plotNo}</td>
+            <td>${siteData.status} (${siteData.progress || 0}%)</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}">
+                    ${p.archived ? '↻ Unarchive' : '📦 Archive'}
+                </button>
+                <button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete">
+                    🗑️ Delete
+                </button>
+                ${archivedBadge}
+            </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="7">No projects accessible.</td></tr>';
+
+    // Attach event listeners to action buttons
+    attachProjectActionListeners();
+}
+
+// Attach listeners to archive/delete action buttons
+function attachProjectActionListeners() {
+    document.querySelectorAll('.archive-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent row selection
+            const jobNo = btn.dataset.jobNo;
+            handleArchiveProject(jobNo);
+        });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent row selection
+            const jobNo = btn.dataset.jobNo;
+            showDeleteConfirmationModal(jobNo);
+        });
+    });
+}
+
+// Handle archiving/unarchiving a project
+async function handleArchiveProject(jobNo) {
+    const project = await window.DB.getProject(jobNo);
+    if (!project) {
+        alert('Project not found');
+        return;
+    }
+
+    const isArchived = project.archived || false;
+    const action = isArchived ? 'Unarchive' : 'Archive';
+    
+    showArchiveConfirmationModal(jobNo, action, async () => {
+        project.archived = !isArchived;
+        await window.DB.putProject(project);
+        await renderProjectList();
+        alert(`Project ${action.toLowerCase()}d successfully!`);
+    });
+}
+
+// Show archive confirmation modal
+function showArchiveConfirmationModal(jobNo, action, onConfirm) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center;">
+            <h2 style="margin-top: 0; color: #333;">${action} Project?</h2>
+            <p style="color: #666; margin: 15px 0;">
+                ${action === 'Archive' ? 'This project will be hidden from the main list.' : 'This project will be visible in the main list again.'}
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="confirm-btn" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    ${action}
+                </button>
+                <button id="cancel-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#confirm-btn').addEventListener('click', () => {
+        document.body.removeChild(modal);
+        onConfirm();
+    });
+
+    modal.querySelector('#cancel-btn').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+// Show delete confirmation modal
+function showDeleteConfirmationModal(jobNo) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; text-align: center;">
+            <h2 style="margin-top: 0; color: #d9534f;">⚠️ Delete Project?</h2>
+            <p style="color: #666; margin: 15px 0;">
+                This action cannot be undone. To confirm deletion, please type the project ID:
+            </p>
+            <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold; font-family: monospace; color: #333;">
+                ${jobNo}
+            </p>
+            <input 
+                type="text" 
+                id="delete-confirm-input" 
+                placeholder="Type project ID to confirm" 
+                style="width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: monospace;"
+            />
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="confirm-delete-btn" style="padding: 10px 20px; background: #d9534f; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Delete
+                </button>
+                <button id="cancel-delete-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const confirmBtn = modal.querySelector('#confirm-delete-btn');
+    const cancelBtn = modal.querySelector('#cancel-delete-btn');
+    const input = modal.querySelector('#delete-confirm-input');
+
+    confirmBtn.addEventListener('click', async () => {
+        if (input.value === jobNo) {
+            document.body.removeChild(modal);
+            await handleDeleteProject(jobNo);
+        } else {
+            alert('Project ID does not match. Deletion cancelled.');
+            document.body.removeChild(modal);
+        }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+
+    input.focus();
+}
+
+// Handle permanent deletion of a project
+async function handleDeleteProject(jobNo) {
+    try {
+        await window.DB.delete('projects', jobNo);
+        // Also delete associated site data
+        await window.DB.delete('siteData', jobNo);
+        await renderProjectList();
+        alert('Project deleted successfully!');
+    } catch (error) {
+        console.error('Error deleting project:', error);
+        alert('Error deleting project. Please try again.');
+    }
 }
 
 function showGlobalView() {
