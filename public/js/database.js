@@ -109,7 +109,9 @@
                     DB_PROVIDER: cfg.DB_PROVIDER,
                     DB_API_BASE_URL: cfg.DB_API_BASE_URL,
                     GOOGLE_DRIVE_ENABLED: cfg.GOOGLE_DRIVE_ENABLED,
-                    GOOGLE_DRIVE_ROOT_FOLDER: cfg.GOOGLE_DRIVE_ROOT_FOLDER
+                    GOOGLE_DRIVE_ROOT_FOLDER: cfg.GOOGLE_DRIVE_ROOT_FOLDER,
+                    MEDIA_STORAGE_PROVIDER: cfg.MEDIA_STORAGE_PROVIDER,
+                    MONGODB_STORE_BASE64_FILES: cfg.MONGODB_STORE_BASE64_FILES
                 });
             } catch (error) {
                 console.error('[DB] ❌ CRITICAL: Could not load runtime config from /api/config:', error.message);
@@ -785,7 +787,17 @@
             fileType: fileData.fileType || fileData.type || 'application/octet-stream'
         };
 
-        if (DriveSync.isEnabled() && normalized.dataUrl) {
+        const mediaStorageProvider = getEnvValue('MEDIA_STORAGE_PROVIDER', 'gdrive').toLowerCase();
+        const useMongoDbBase64 = asBoolean(getEnvValue('MONGODB_STORE_BASE64_FILES', 'false'));
+
+        if (mediaStorageProvider === 'mongodb' && useMongoDbBase64) {
+            // MongoDB base64 storage: require dataUrl
+            if (!normalized.dataUrl) {
+                throw new Error('Base64 file data required for MongoDB storage.');
+            }
+            normalized.storageMethod = 'mongodb-base64';
+        } else if (DriveSync.isEnabled() && normalized.dataUrl) {
+            // Google Drive storage
             try {
                 const uploaded = await DriveSync.uploadDataUrlFile(normalized);
                 if (uploaded?.id) {
@@ -793,17 +805,18 @@
                     normalized.driveFolderPath = uploaded.folderPath || null;
                     normalized.driveWebViewLink = uploaded.webViewLink || null;
                     normalized.driveWebContentLink = uploaded.webContentLink || null;
-                    normalized.storageProvider = 'gdrive';
+                    normalized.storageMethod = 'gdrive';
                     if (!DriveSync.shouldCacheDataUrl()) {
                         delete normalized.dataUrl;
                     }
                 }
             } catch (error) {
                 console.warn('Google Drive upload failed. Falling back to IndexedDB dataUrl storage.', error);
-                normalized.storageProvider = 'indexeddb';
+                normalized.storageMethod = 'indexeddb-only';
             }
         } else {
-            normalized.storageProvider = normalized.storageProvider || 'indexeddb';
+            // Fallback: IndexedDB only
+            normalized.storageMethod = normalized.storageMethod || 'indexeddb-only';
         }
 
         return publicAPI.add(STORES.FILES, normalized);
@@ -813,14 +826,37 @@
         if (!file) return file;
         if (!shouldHydrate) return file;
         if (file.dataUrl) return file;
-        if (!DriveSync.isEnabled() || !file.driveFileId) return file;
 
+        const storageMethod = file.storageMethod || (file.driveFileId ? 'gdrive' : 'indexeddb-only');
+        
         try {
-            const dataUrl = await DriveSync.downloadFileAsDataUrl(file.driveFileId);
-            if (!dataUrl) return file;
-            return { ...file, dataUrl };
+            if (storageMethod === 'mongodb-base64') {
+                // For MongoDB base64 storage, file should already have dataUrl in database
+                // If missing, it's a data integrity issue - log warning and return
+                if (!file.dataUrl) {
+                    console.warn(`[DB] MongoDB base64 file ${file.id} missing dataUrl. Integrity check failed.`);
+                    return file;
+                }
+                return file;
+            } else if (storageMethod === 'gdrive' && DriveSync.isEnabled() && file.driveFileId) {
+                // For Google Drive storage, fetch from Drive API
+                const dataUrl = await DriveSync.downloadFileAsDataUrl(file.driveFileId);
+                if (!dataUrl) {
+                    console.warn(`[DB] Google Drive download failed for file ${file.id || file.driveFileId}.`);
+                    return file;
+                }
+                return { ...file, dataUrl };
+            } else if (storageMethod === 'indexeddb-only') {
+                // For IndexedDB-only storage, dataUrl should already be present
+                if (!file.dataUrl) {
+                    console.warn(`[DB] IndexedDB file ${file.id} missing dataUrl.`);
+                }
+                return file;
+            }
+            
+            return file;
         } catch (error) {
-            console.warn(`Google Drive download failed for file ${file.id || file.driveFileId}.`, error);
+            console.warn(`[DB] File hydration failed for file ${file.id}. StorageMethod: ${storageMethod}. Error:`, error);
             return file;
         }
     }

@@ -34,7 +34,9 @@ app.get('/api/config', (_req, res) => {
     GOOGLE_DRIVE_OAUTH_CLIENT_ID: process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID || '',
     GOOGLE_DRIVE_SCOPES: process.env.GOOGLE_DRIVE_SCOPES || 'https://www.googleapis.com/auth/drive.file',
     GOOGLE_DRIVE_ROOT_FOLDER: process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'UrbanAxis Media',
-    GOOGLE_DRIVE_STORE_LOCAL_CACHE: process.env.GOOGLE_DRIVE_STORE_LOCAL_CACHE || 'false'
+    GOOGLE_DRIVE_STORE_LOCAL_CACHE: process.env.GOOGLE_DRIVE_STORE_LOCAL_CACHE || 'false',
+    MEDIA_STORAGE_PROVIDER: process.env.MEDIA_STORAGE_PROVIDER || 'gdrive',
+    MONGODB_STORE_BASE64_FILES: process.env.MONGODB_STORE_BASE64_FILES || 'false'
   });
 });
 

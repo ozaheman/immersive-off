@@ -19,6 +19,28 @@ const STORES = {
   RECIPIENT_HISTORY: 'recipientHistory'
 };
 
+/**
+ * File Record Schema:
+ * {
+ *   id: number (auto-increment)
+ *   jobNo: string
+ *   source: string ('master', 'site', etc.)
+ *   category: string
+ *   subCategory: string
+ *   name: string (filename)
+ *   fileType: string (MIME type)
+ *   dataUrl: string (base64 data URL - always present for mongodb-base64, optional for gdrive)
+ *   driveFileId: string (Google Drive file ID, only when storageMethod=gdrive)
+ *   driveFolderPath: string (full path in Google Drive)
+ *   driveWebViewLink: string (Drive preview link)
+ *   driveWebContentLink: string (Drive download link)
+ *   storageMethod: string ('gdrive', 'mongodb-base64', 'indexeddb-only')
+ *   expiryDate: string (optional ISO date)
+ *   timestamp: string (ISO timestamp)
+ *   lastSync: string (sync timestamp)
+ * }
+ */
+
 const STORE_META = {
   [STORES.PROJECTS]: { keyPath: 'jobNo', autoIncrement: false },
   [STORES.SITE_DATA]: { keyPath: 'jobNo', autoIncrement: false },
