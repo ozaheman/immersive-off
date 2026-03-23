@@ -125,12 +125,21 @@ app.delete('/api/db/:store', requireRemoteDb, async (req, res) => {
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// SPA fallback - serve index.html for all non-API routes
+// SPA fallback - serve index.html for page routes, but not static assets
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     res.status(404).json({ error: 'API route not found' });
     return;
   }
+  
+  // Don't serve index.html for static asset requests (files with extensions)
+  const staticAssetPattern = /\.[a-zA-Z0-9]+$/; // Matches any file with extension
+  if (staticAssetPattern.test(req.path)) {
+    res.status(404).send('Not found');
+    return;
+  }
+  
+  // Serve index.html for page/app routes
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
