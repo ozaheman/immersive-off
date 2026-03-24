@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "UrbanAxis app with pluggable DB provider (MongoDB/PostgreSQL/IndexedDB)",
-  "main": "server/index.js",
+  "main": "server/index.cjs",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "start": "node server/index.cjs",
+    "dev": "node --watch server/index.cjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
