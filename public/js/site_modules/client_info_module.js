@@ -1,7 +1,7 @@
 
 // --- START OF FILE js/site_modules/client_info_module.js ---
 
-const ClientInfoModule = (() => {
+export const ClientInfoModule = (() => {
     let elements = {};
     let currentData = {};
 
@@ -97,5 +97,3 @@ const ClientInfoModule = (() => {
 
     return { init, render };
 })();
-
-export { ClientInfoModule };

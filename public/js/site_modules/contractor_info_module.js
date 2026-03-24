@@ -1,6 +1,6 @@
 // --- START OF FILE js/site_modules/contractor_info_module.js ---
 
-const ContractorInfoModule = (() => {
+export const ContractorInfoModule = (() => {
     let elements = {};
     let currentData = {};
 
@@ -90,5 +90,3 @@ const ContractorInfoModule = (() => {
 
     return { init, render };
 })();
-
-export { ContractorInfoModule };

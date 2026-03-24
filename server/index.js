@@ -67,7 +67,7 @@ app.get('/api/db/:store/:id', requireRemoteDb, async (req, res) => {
     const key = parseKey(store, id);
     const data = await dbAdapter.get(store, key);
     if (!data) {
-      res.status(404).json({ error: 'Record not found' });
+      res.status(404).json({ data: null });
       return;
     }
     res.json({ data });
