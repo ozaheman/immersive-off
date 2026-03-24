@@ -1,5 +1,5 @@
-const MongoAdapter = require('./adapters/mongoAdapter.cjs');
-const PostgresAdapter = require('./adapters/postgresAdapter.cjs');
+const MongoAdapter = require('./adapters/mongoAdapter');
+const PostgresAdapter = require('./adapters/postgresAdapter');
 
 function createAdapterFromEnv(env) {
   const provider = (env.DB_PROVIDER || 'indexeddb').toLowerCase();

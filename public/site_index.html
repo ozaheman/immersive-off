@@ -2211,12 +2211,15 @@
     <script src="js/bim_viewer.js"></script>
     <script src="js/letter_templates.js"></script>
     <script src="js/site_letter_templates.js"></script>
-
-    <!-- NEW MODULES -->
-    <script type="module" src="js/site_modules/client_info_module.js"></script>
-    <script type="module" src="js/site_modules/contractor_info_module.js"></script>
-    <!-- MAIN APP LOGIC -->
-
+    <!-- CommonJS shim for browser environment (fixes "exports is not defined" errors) -->
+    <script>
+      if (typeof exports === 'undefined') {
+        var exports = {};
+      }
+      if (typeof module === 'undefined') {
+        var module = { exports: exports };
+      }
+    </script>
     <!-- MAIN APP LOGIC (loads all modules via imports) -->
     <script type="module" src="js/site_index.js"></script>
 

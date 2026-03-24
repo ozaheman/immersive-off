@@ -1,5 +1,5 @@
 const { Pool } = require('pg');
-const { getStoreMeta } = require('../storeConfig.cjs');
+const { getStoreMeta } = require('../storeConfig');
 
 class PostgresAdapter {
   constructor({ connectionString, sslMode }) {

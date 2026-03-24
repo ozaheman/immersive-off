@@ -1,5 +1,5 @@
 const { MongoClient } = require('mongodb');
-const { getStoreMeta } = require('../storeConfig.cjs');
+const { getStoreMeta } = require('../storeConfig');
 
 class MongoAdapter {
   constructor({ uri, dbName }) {
