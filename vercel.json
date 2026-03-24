@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/index.cjs",
+      "src": "server/index.js",
       "use": "@vercel/node",
       "config": {
         "nodeVersion": "20.x"
@@ -12,11 +12,11 @@
   "routes": [
     {
       "src": "/api/.*",
-      "dest": "server/index.cjs"
+      "dest": "server/index.js"
     },
     {
       "src": "/(?!api/).*",
-      "dest": "server/index.cjs"
+      "dest": "server/index.js"
     }
   ],
   "env": {
