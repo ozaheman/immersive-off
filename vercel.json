@@ -11,12 +11,11 @@
   ],
   "routes": [
     {
-      "src": "/api/.*",
+      "src": "/api/(.*)",
       "dest": "server/index.js"
     },
     {
-      "src": "/(?!api/).*",
-      "dest": "server/index.js"
+      "handle": "filesystem"
     }
   ],
   "env": {
