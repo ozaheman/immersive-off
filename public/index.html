@@ -368,6 +368,42 @@
             padding: 0 20px 20px 20px;
         }
 
+        .dashboard-loader {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 20px;
+            padding: 8px 12px;
+            background: #eef4ff;
+            border: 1px solid #cfe0ff;
+            border-radius: 6px;
+            color: #1f3f7a;
+            font-weight: 600;
+        }
+
+        .dashboard-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #8fb1e8;
+            border-top-color: #1f3f7a;
+            border-radius: 50%;
+            animation: uaSpin 0.8s linear infinite;
+        }
+
+        @keyframes uaSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .dash-cal-loading {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
         .project-list-container {
             flex-grow: 1;
         }
@@ -742,6 +778,10 @@
                     <input type="checkbox" id="show-archived-toggle">
                     <span>Show Archived Projects</span>
                 </label>
+            </div>
+            <div id="dashboard-loader" class="dashboard-loader" aria-live="polite">
+                <span class="dashboard-spinner" aria-hidden="true"></span>
+                <span id="dashboard-loader-text">Loading dashboard data...</span>
             </div>
             <div class="dashboard-main-content">
                 <div class="project-list-container">

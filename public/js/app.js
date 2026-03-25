@@ -30,7 +30,8 @@ const App = {
             otherInputEl.value = value || otherValue || '';
             if (otherInputEl.parentElement) otherInputEl.parentElement.style.display = 'block';
         }
-    }
+    },
+    dashboardLoadingDepth: 0
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,13 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
             await render();
         }
         async function render() {
-            const items = await DB.getBulletinItems(20);
             const container = App.DOMElements['bulletin-list'];
             if (!container) return;
-            if (items.length === 0) {
-                container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">No recent activity.</p>';
-            } else {
-                container.innerHTML = items.map(item => `
+            container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">Loading activity...</p>';
+            setDashboardLoadingState(true, 'Loading activity feed...');
+            try {
+                const items = await DB.getBulletinItems(20);
+                if (items.length === 0) {
+                    container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">No recent activity.</p>';
+                } else {
+                    container.innerHTML = items.map(item => `
             <div class="bulletin-item">
                 <div class="bulletin-item-header">
                     <span class="bulletin-item-title">${item.title}</span>
@@ -59,6 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="bulletin-item-body">${item.body}</div>
             </div>`).join('');
+                }
+            } catch (error) {
+                console.error('Bulletin load error:', error);
+                container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">No recent activity.</p>';
+            } finally {
+                setDashboardLoadingState(false);
             }
         }
         return { log, render };
@@ -73,61 +83,99 @@ document.addEventListener('DOMContentLoaded', () => {
             render();
         }
         async function render() {
-            const allStaff = await DB.getAllHRData();
-            const eventsByDate = {};
-            allStaff.forEach(staff => {
-                (staff.leaves || []).forEach(leave => {
-                    let currentDate = new Date(leave.startDate);
-                    const endDate = new Date(leave.endDate);
-                    endDate.setDate(endDate.getDate() + 1);
-                    while (currentDate < endDate) {
-                        const dateKey = currentDate.toDateString();
-                        if (!eventsByDate[dateKey]) {
-                            eventsByDate[dateKey] = [];
-                        }
-                        eventsByDate[dateKey].push(staff.name);
-                        currentDate.setDate(currentDate.getDate() + 1);
-                    }
-                });
-            });
-            App.DOMElements['dash-cal-month-year'].textContent = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
             const gridBody = App.DOMElements['dash-cal-body'];
-            gridBody.innerHTML = '';
-            const year = calendarDate.getFullYear();
-            const month = calendarDate.getMonth();
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const firstDayOfMonth = new Date(year, month, 1);
-            const startDayOfWeek = firstDayOfMonth.getDay();
-            const currentDay = new Date(firstDayOfMonth);
-            currentDay.setDate(currentDay.getDate() - startDayOfWeek);
-            for (let i = 0; i < 42; i++) {
-                const dayCell = document.createElement('div');
-                dayCell.className = 'dash-cal-day';
-                const dayNum = document.createElement('span');
-                dayNum.className = 'dash-cal-day-num';
-                dayNum.textContent = currentDay.getDate();
-                dayCell.appendChild(dayNum);
-                if (currentDay.getMonth() !== month) dayCell.classList.add('other-month');
-                if (currentDay.getTime() === today.getTime()) dayCell.classList.add('today');
-                const dateKey = currentDay.toDateString();
-                if (eventsByDate[dateKey]) {
-                    dayCell.classList.add('on-leave');
-                    dayCell.title = `On Leave:\n${eventsByDate[dateKey].join('\n')}`;
+            if (gridBody) {
+                gridBody.innerHTML = '<div class="dash-cal-loading">Loading calendar...</div>';
+            }
+            setDashboardLoadingState(true, 'Loading calendar...');
+            try {
+                const allStaff = await DB.getAllHRData();
+                const eventsByDate = {};
+                allStaff.forEach(staff => {
+                    (staff.leaves || []).forEach(leave => {
+                        let currentDate = new Date(leave.startDate);
+                        const endDate = new Date(leave.endDate);
+                        endDate.setDate(endDate.getDate() + 1);
+                        while (currentDate < endDate) {
+                            const dateKey = currentDate.toDateString();
+                            if (!eventsByDate[dateKey]) {
+                                eventsByDate[dateKey] = [];
+                            }
+                            eventsByDate[dateKey].push(staff.name);
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                    });
+                });
+                App.DOMElements['dash-cal-month-year'].textContent = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                gridBody.innerHTML = '';
+                const year = calendarDate.getFullYear();
+                const month = calendarDate.getMonth();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const firstDayOfMonth = new Date(year, month, 1);
+                const startDayOfWeek = firstDayOfMonth.getDay();
+                const currentDay = new Date(firstDayOfMonth);
+                currentDay.setDate(currentDay.getDate() - startDayOfWeek);
+                for (let i = 0; i < 42; i++) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'dash-cal-day';
+                    const dayNum = document.createElement('span');
+                    dayNum.className = 'dash-cal-day-num';
+                    dayNum.textContent = currentDay.getDate();
+                    dayCell.appendChild(dayNum);
+                    if (currentDay.getMonth() !== month) dayCell.classList.add('other-month');
+                    if (currentDay.getTime() === today.getTime()) dayCell.classList.add('today');
+                    const dateKey = currentDay.toDateString();
+                    if (eventsByDate[dateKey]) {
+                        dayCell.classList.add('on-leave');
+                        dayCell.title = `On Leave:\n${eventsByDate[dateKey].join('\n')}`;
+                    }
+                    gridBody.appendChild(dayCell);
+                    currentDay.setDate(currentDay.getDate() + 1);
                 }
-                gridBody.appendChild(dayCell);
-                currentDay.setDate(currentDay.getDate() + 1);
+            } catch (error) {
+                console.error('Dashboard calendar load error:', error);
+                if (gridBody) {
+                    gridBody.innerHTML = '<div class="dash-cal-loading">Calendar data unavailable.</div>';
+                }
+            } finally {
+                setDashboardLoadingState(false);
             }
         }
         return { render, changeMonth };
     })();
 
+    function setDashboardLoadingState(isLoading, message = 'Loading dashboard data...') {
+        const loader = App.DOMElements['dashboard-loader'];
+        const text = App.DOMElements['dashboard-loader-text'];
+        if (!loader) return;
+
+        if (isLoading) {
+            App.dashboardLoadingDepth += 1;
+            if (text && message) text.textContent = message;
+            loader.style.display = 'flex';
+            return;
+        }
+
+        App.dashboardLoadingDepth = Math.max(0, App.dashboardLoadingDepth - 1);
+        if (App.dashboardLoadingDepth === 0) {
+            loader.style.display = 'none';
+        }
+    }
+
+    function showProjectListLoadingRow(message = 'Loading projects...') {
+        const tbody = App.DOMElements['project-list-body'];
+        if (!tbody) return;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">${message}</td></tr>`;
+    }
+
     // --- INITIALIZATION ---
     async function main() {
         try {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
-            await DB.init();
             cacheDOMElements();
+            setDashboardLoadingState(true, 'Initializing database...');
+            await DB.init();
             Object.values(App.ProjectTabs).forEach(module => module.init?.());
             initResizer();
             setupEventListeners();
@@ -138,6 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Fatal Error initializing application:", error);
             document.body.innerHTML = `<div style='padding:40px; text-align:center; color:red;'><h2>Application Failed to Start</h2><p>Could not initialize the database. Please try clearing your browser's cache and site data for this page and try again.</p><p><i>Error: ${error.message}</i></p></div>`;
+        } finally {
+            setDashboardLoadingState(false);
         }
     }
     // MODIFICATION START: Added helper to refresh Design Studio selector
@@ -224,174 +274,194 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DASHBOARD FUNCTIONS ---
     async function renderDashboard() {
-        const allProjects = await DB.getAllProjects();
-        const allSiteData = await DB.getAllSiteData();
-        const siteDataMap = new Map(allSiteData.map(data => [data.jobNo, data]));
-
-        // Defer non-critical summary calculations to happen after rendering
-        updateDashboardSummary(allProjects).catch(err => console.error('Dashboard summary update error:', err));
+        setDashboardLoadingState(true, 'Loading project list...');
+        showProjectListLoadingRow();
 
         const tbody = App.DOMElements['project-list-body'];
-        tbody.innerHTML = '';
-        if (allProjects.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">No projects found. Use "+ New Sample" to add a demo project or "Import Master" to add your own.</td></tr>';
-            return;
-        }
+        try {
+            const allProjects = await DB.getAllProjects();
+            const allSiteData = await DB.getAllSiteData();
+            const siteDataMap = new Map(allSiteData.map(data => [data.jobNo, data]));
 
-        const searchTerm = App.DOMElements['search-box'].value.toLowerCase().trim();
-        const searchWords = searchTerm.split(' ').filter(word => word.length > 0);
+            // Defer non-critical summary calculations to happen after rendering
+            updateDashboardSummary(allProjects).catch(err => console.error('Dashboard summary update error:', err));
 
-        const filteredProjects = allProjects.filter(p => {
-            if (searchWords.length === 0) return true;
-            const projectDataToSearch = [p.clientName, p.plotNo, p.jobNo, p.projectType, p.area, ...(p.invoices || []).map(inv => inv.no)].filter(Boolean).join(' ').toLowerCase();
-            return searchWords.every(word => projectDataToSearch.includes(word));
-        });
-
-        // Filter archived projects based on toggle state
-        const showArchived = App.DOMElements['show-archived-toggle']?.checked || false;
-        const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
-
-        // Pre-fetch all scrum data in parallel
-        const scrumDataMap = new Map();
-        const sortedProjects = displayedProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
-        const scrumPromises = sortedProjects.map(async p => {
-            const scrumData = await DB.getScrumData(p.jobNo);
-            scrumDataMap.set(p.jobNo, scrumData);
-        });
-        await Promise.all(scrumPromises);
-
-        // Pre-fetch all master files in parallel (without hydration)
-        const filesMap = new Map();
-        const filePromises = sortedProjects.map(async p => {
-            const masterFiles = await DB.getFiles(p.jobNo, 'master', true);
-            filesMap.set(p.jobNo, masterFiles);
-        });
-        await Promise.all(filePromises);
-
-        for (const p of sortedProjects) {
-            const row = tbody.insertRow();
-            row.dataset.jobNo = p.jobNo;
-            row.className = p.archived ? 'archived-row' : '';
-            const siteData = siteDataMap.get(p.jobNo) || {};
-            const siteStatus = siteData.status || 'N/A';
-            const progress = siteData.progress || 0;
-            const revNo = p.revNo || 'R0';
-            const officeStatusClass = (p.projectStatus || 'pending').toLowerCase().replace(/ /g, '-');
-            const siteStatusClass = siteStatus.toLowerCase().replace(/ /g, '-');
-
-            const scrumData = scrumDataMap.get(p.jobNo);
-            const scrumProgressHtml = generateScrumProgressBarHtml(scrumData);
-
-            const statusHtml = `<div>Office: <span class="status-${officeStatusClass}">${p.projectStatus || 'Pending'}</span></div> <div style="margin-top:4px;">Site: <span class="status-${siteStatusClass}">${siteStatus}</span></div> <div class="progress-bar-container" style="height:14px; margin-top:4px;"><div class="progress-bar" style="width:${progress}%; height:14px; font-size:0.7em;">${progress}%</div></div>${scrumProgressHtml}`;
-
-            const masterFiles = filesMap.get(p.jobNo) || [];
-            const affectionPlanFile = masterFiles.find(f => f.subCategory === 'affection_plan');
-            const docHtml = affectionPlanFile ? `<a href="#" class="file-link" data-file-id="${affectionPlanFile.id}">Affection Plan</a>` : `<span class="file-link not-available">Affection Plan</span>`;
-
-            const invoicesToDisplay = App.showAllInvoices ? (p.invoices || []) : (p.invoices || []).filter(inv => inv.status === 'Raised' || inv.status === 'Pending');
-            const invoiceDetailsHtml = invoicesToDisplay.length > 0 ? invoicesToDisplay.map(inv => `<div class="invoice-row status-${(inv.status || '').toLowerCase()}"><span><b>${inv.no}</b></span><span>${inv.date}</span><span style="font-weight:bold; text-align:right;">${App.formatCurrency(parseFloat(inv.total || 0))}</span><span>(${inv.status})</span></div>`).join('') : (App.showAllInvoices ? 'No invoices' : 'No pending invoices');
-
-            const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
-
-            let actionsHtml = `<button class="edit-btn">View/Edit</button>`;
-            if (p.projectStatus === 'Under Supervision') {
-                actionsHtml += `<button class="bill-monthly-btn secondary-button" data-job-no="${p.jobNo}">+ Monthly Inv</button>`;
+            tbody.innerHTML = '';
+            if (allProjects.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">No projects found. Use "+ New Sample" to add a demo project or "Import Master" to add your own.</td></tr>';
+                return;
             }
-            actionsHtml += `<button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}" style="margin-left: 5px;">
-                ${p.archived ? '↻ Unarchive' : '📦 Archive'}
-            </button>`;
-            actionsHtml += `<button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete" style="margin-left: 5px;">
-                🗑️ Delete
-            </button>`;
-            actionsHtml += archivedBadge;
 
-            row.innerHTML = `<td><b>${p.jobNo}</b><br><small style="color:#666">(${revNo})</small></td><td>${p.clientName}<br><small>${p.clientMobile || ''}</small></td><td>${p.plotNo}<br><small><b>${p.projectType || 'N/A'}</b> / ${p.agreementDate || ''}</small></td><td>${statusHtml}</td><td>${docHtml}</td><td><div class="invoice-container">${invoiceDetailsHtml}</div></td><td>${actionsHtml}</td>`;
+            const searchTerm = App.DOMElements['search-box'].value.toLowerCase().trim();
+            const searchWords = searchTerm.split(' ').filter(word => word.length > 0);
+
+            const filteredProjects = allProjects.filter(p => {
+                if (searchWords.length === 0) return true;
+                const projectDataToSearch = [p.clientName, p.plotNo, p.jobNo, p.projectType, p.area, ...(p.invoices || []).map(inv => inv.no)].filter(Boolean).join(' ').toLowerCase();
+                return searchWords.every(word => projectDataToSearch.includes(word));
+            });
+
+            // Filter archived projects based on toggle state
+            const showArchived = App.DOMElements['show-archived-toggle']?.checked || false;
+            const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
+
+            // Pre-fetch all scrum data in parallel
+            const scrumDataMap = new Map();
+            const sortedProjects = displayedProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
+            const scrumPromises = sortedProjects.map(async p => {
+                const scrumData = await DB.getScrumData(p.jobNo);
+                scrumDataMap.set(p.jobNo, scrumData);
+            });
+            await Promise.all(scrumPromises);
+
+            // Pre-fetch all master files in parallel (without hydration)
+            const filesMap = new Map();
+            const filePromises = sortedProjects.map(async p => {
+                const masterFiles = await DB.getFiles(p.jobNo, 'master', true);
+                filesMap.set(p.jobNo, masterFiles);
+            });
+            await Promise.all(filePromises);
+
+            for (const p of sortedProjects) {
+                const row = tbody.insertRow();
+                row.dataset.jobNo = p.jobNo;
+                row.className = p.archived ? 'archived-row' : '';
+                const siteData = siteDataMap.get(p.jobNo) || {};
+                const siteStatus = siteData.status || 'N/A';
+                const progress = siteData.progress || 0;
+                const revNo = p.revNo || 'R0';
+                const officeStatusClass = (p.projectStatus || 'pending').toLowerCase().replace(/ /g, '-');
+                const siteStatusClass = siteStatus.toLowerCase().replace(/ /g, '-');
+
+                const scrumData = scrumDataMap.get(p.jobNo);
+                const scrumProgressHtml = generateScrumProgressBarHtml(scrumData);
+
+                const statusHtml = `<div>Office: <span class="status-${officeStatusClass}">${p.projectStatus || 'Pending'}</span></div> <div style="margin-top:4px;">Site: <span class="status-${siteStatusClass}">${siteStatus}</span></div> <div class="progress-bar-container" style="height:14px; margin-top:4px;"><div class="progress-bar" style="width:${progress}%; height:14px; font-size:0.7em;">${progress}%</div></div>${scrumProgressHtml}`;
+
+                const masterFiles = filesMap.get(p.jobNo) || [];
+                const affectionPlanFile = masterFiles.find(f => f.subCategory === 'affection_plan');
+                const docHtml = affectionPlanFile ? `<a href="#" class="file-link" data-file-id="${affectionPlanFile.id}">Affection Plan</a>` : `<span class="file-link not-available">Affection Plan</span>`;
+
+                const invoicesToDisplay = App.showAllInvoices ? (p.invoices || []) : (p.invoices || []).filter(inv => inv.status === 'Raised' || inv.status === 'Pending');
+                const invoiceDetailsHtml = invoicesToDisplay.length > 0 ? invoicesToDisplay.map(inv => `<div class="invoice-row status-${(inv.status || '').toLowerCase()}"><span><b>${inv.no}</b></span><span>${inv.date}</span><span style="font-weight:bold; text-align:right;">${App.formatCurrency(parseFloat(inv.total || 0))}</span><span>(${inv.status})</span></div>`).join('') : (App.showAllInvoices ? 'No invoices' : 'No pending invoices');
+
+                const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
+
+                let actionsHtml = `<button class="edit-btn">View/Edit</button>`;
+                if (p.projectStatus === 'Under Supervision') {
+                    actionsHtml += `<button class="bill-monthly-btn secondary-button" data-job-no="${p.jobNo}">+ Monthly Inv</button>`;
+                }
+                actionsHtml += `<button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}" style="margin-left: 5px;">
+                    ${p.archived ? '↻ Unarchive' : '📦 Archive'}
+                </button>`;
+                actionsHtml += `<button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete" style="margin-left: 5px;">
+                    🗑️ Delete
+                </button>`;
+                actionsHtml += archivedBadge;
+
+                row.innerHTML = `<td><b>${p.jobNo}</b><br><small style="color:#666">(${revNo})</small></td><td>${p.clientName}<br><small>${p.clientMobile || ''}</small></td><td>${p.plotNo}<br><small><b>${p.projectType || 'N/A'}</b> / ${p.agreementDate || ''}</small></td><td>${statusHtml}</td><td>${docHtml}</td><td><div class="invoice-container">${invoiceDetailsHtml}</div></td><td>${actionsHtml}</td>`;
+            }
+        } catch (error) {
+            console.error('Dashboard render error:', error);
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Unable to load project list right now. Default values are retained.</td></tr>';
+            }
+        } finally {
+            setDashboardLoadingState(false);
         }
     }
 
 
     async function updateDashboardSummary(projects) {
-        let totalPendingAmount = 0, pendingInvoiceCount = 0, totalOnHoldAmount = 0, lastPaidInvoice = null; // NEW: Built-Up Area Calc
-        let totalBUA = 0;
-        let supervisionBUA = 0;
-        let progressBUA = 0;
+        setDashboardLoadingState(true, 'Loading dashboard summary...');
+        try {
+            let totalPendingAmount = 0, pendingInvoiceCount = 0, totalOnHoldAmount = 0, lastPaidInvoice = null; // NEW: Built-Up Area Calc
+            let totalBUA = 0;
+            let supervisionBUA = 0;
+            let progressBUA = 0;
 
-        projects.forEach(p => {
-            const area = parseFloat(p.builtUpArea) || 0;
-            const status = p.projectStatus || '';
+            projects.forEach(p => {
+                const area = parseFloat(p.builtUpArea) || 0;
+                const status = p.projectStatus || '';
 
-            // Sum based on logic
-            if (status === 'Under Supervision') supervisionBUA += area;
-            if (status === 'In Progress' || status === 'Design Stage') progressBUA += area;
+                // Sum based on logic
+                if (status === 'Under Supervision') supervisionBUA += area;
+                if (status === 'In Progress' || status === 'Design Stage') progressBUA += area;
 
-            // You can define what counts as "Total" (active projects)
-            if (status !== 'Completed' && status !== 'Cancelled') {
-                totalBUA += area;
-            }
-        });
+                // You can define what counts as "Total" (active projects)
+                if (status !== 'Completed' && status !== 'Cancelled') {
+                    totalBUA += area;
+                }
+            });
 
-        document.getElementById('total-bua-display').textContent = `${totalBUA.toLocaleString()} sq.ft`;
-        document.getElementById('bua-supervision').textContent = supervisionBUA.toLocaleString();
-        document.getElementById('bua-progress').textContent = progressBUA.toLocaleString();
-        projects.forEach(p => {
-            (p.invoices || []).forEach(inv => {
-                if (inv.status === 'Paid' && inv.paymentDetails) {
-                    if (!lastPaidInvoice || new Date(inv.paymentDetails.date) > new Date(lastPaidInvoice.paymentDetails.date)) {
-                        lastPaidInvoice = inv;
+            document.getElementById('total-bua-display').textContent = `${totalBUA.toLocaleString()} sq.ft`;
+            document.getElementById('bua-supervision').textContent = supervisionBUA.toLocaleString();
+            document.getElementById('bua-progress').textContent = progressBUA.toLocaleString();
+            projects.forEach(p => {
+                (p.invoices || []).forEach(inv => {
+                    if (inv.status === 'Paid' && inv.paymentDetails) {
+                        if (!lastPaidInvoice || new Date(inv.paymentDetails.date) > new Date(lastPaidInvoice.paymentDetails.date)) {
+                            lastPaidInvoice = inv;
+                        }
+                    } else if (inv.status === 'Raised' || inv.status === 'Pending') {
+                        pendingInvoiceCount++;
+                        totalPendingAmount += parseFloat(inv.total || 0);
+                    } else if (inv.status === 'On Hold') {
+                        totalOnHoldAmount += parseFloat(inv.total || 0);
                     }
-                } else if (inv.status === 'Raised' || inv.status === 'Pending') {
-                    pendingInvoiceCount++;
-                    totalPendingAmount += parseFloat(inv.total || 0);
-                } else if (inv.status === 'On Hold') {
-                    totalOnHoldAmount += parseFloat(inv.total || 0);
-                }
+                });
             });
-        });
 
-        App.DOMElements['pending-invoices-count'].textContent = pendingInvoiceCount;
-        App.DOMElements['pending-invoices-amount'].textContent = ` ${App.formatCurrency(totalPendingAmount)}`;
-        App.DOMElements['last-paid-amount'].textContent = lastPaidInvoice ? ` ${App.formatCurrency(lastPaidInvoice.paymentDetails.amountPaid)}` : 'N/A';
-        App.DOMElements['on-hold-amount'].textContent = ` ${App.formatCurrency(totalOnHoldAmount)}`;
+            App.DOMElements['pending-invoices-count'].textContent = pendingInvoiceCount;
+            App.DOMElements['pending-invoices-amount'].textContent = ` ${App.formatCurrency(totalPendingAmount)}`;
+            App.DOMElements['last-paid-amount'].textContent = lastPaidInvoice ? ` ${App.formatCurrency(lastPaidInvoice.paymentDetails.amountPaid)}` : 'N/A';
+            App.DOMElements['on-hold-amount'].textContent = ` ${App.formatCurrency(totalOnHoldAmount)}`;
 
-        const allMasterFiles = await DB.getAllFiles(true);
-        const now = new Date();
-        const thirtyDaysFromNow = new Date();
-        thirtyDaysFromNow.setDate(now.getDate() + 30);
-        const expiringDocs = allMasterFiles.filter(file => {
-            if (!file.expiryDate) return false;
-            const expiry = new Date(file.expiryDate);
-            return expiry >= now && expiry <= thirtyDaysFromNow;
-        });
-        App.DOMElements['expiring-documents-count'].textContent = expiringDocs.length;
-
-        // MODIFICATION START: Calculate Monthly financial trackers
-        const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
-        let monthlyIncome = 0;
-        projects.forEach(p => {
-            (p.invoices || []).forEach(inv => {
-                if (inv.status === 'Paid' && inv.paymentDetails && inv.paymentDetails.date.substring(0, 7) === currentMonth) {
-                    monthlyIncome += parseFloat(inv.paymentDetails.amountPaid || inv.total || 0);
-                }
+            const allMasterFiles = await DB.getAllFiles(true);
+            const now = new Date();
+            const thirtyDaysFromNow = new Date();
+            thirtyDaysFromNow.setDate(now.getDate() + 30);
+            const expiringDocs = allMasterFiles.filter(file => {
+                if (!file.expiryDate) return false;
+                const expiry = new Date(file.expiryDate);
+                return expiry >= now && expiry <= thirtyDaysFromNow;
             });
-        });
+            App.DOMElements['expiring-documents-count'].textContent = expiringDocs.length;
 
-        const staffList = await DB.getAllHRData();
-        const officeExpenses = await DB.getOfficeExpenses();
+            // MODIFICATION START: Calculate Monthly financial trackers
+            const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+            let monthlyIncome = 0;
+            projects.forEach(p => {
+                (p.invoices || []).forEach(inv => {
+                    if (inv.status === 'Paid' && inv.paymentDetails && inv.paymentDetails.date.substring(0, 7) === currentMonth) {
+                        monthlyIncome += parseFloat(inv.paymentDetails.amountPaid || inv.total || 0);
+                    }
+                });
+            });
 
-        const monthlyStaffSalaries = staffList.reduce((sum, s) => sum + (parseFloat(s.grossSalary) || 0), 0);
-        const annualOfficeExpenses = officeExpenses.filter(e => e.frequency === 'annual').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-        const proratedMonthlyOfficeExpenses = annualOfficeExpenses / 12;
+            const staffList = await DB.getAllHRData();
+            const officeExpenses = await DB.getOfficeExpenses();
 
-        // Add monthly fixed expenses (if any are marked monthly)
-        const directMonthlyExpenses = officeExpenses.filter(e => e.frequency === 'monthly').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            const monthlyStaffSalaries = staffList.reduce((sum, s) => sum + (parseFloat(s.grossSalary) || 0), 0);
+            const annualOfficeExpenses = officeExpenses.filter(e => e.frequency === 'annual').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            const proratedMonthlyOfficeExpenses = annualOfficeExpenses / 12;
 
-        const totalMonthlyExpense = monthlyStaffSalaries + proratedMonthlyOfficeExpenses + directMonthlyExpenses;
-        const monthlyBalance = monthlyIncome - totalMonthlyExpense;
+            // Add monthly fixed expenses (if any are marked monthly)
+            const directMonthlyExpenses = officeExpenses.filter(e => e.frequency === 'monthly').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
-        if (App.DOMElements['monthly-expense-total']) App.DOMElements['monthly-expense-total'].textContent = App.formatCurrency(totalMonthlyExpense);
-        if (App.DOMElements['monthly-income-total']) App.DOMElements['monthly-income-total'].textContent = App.formatCurrency(monthlyIncome);
-        if (App.DOMElements['monthly-balance-total']) App.DOMElements['monthly-balance-total'].textContent = App.formatCurrency(monthlyBalance);
-        // MODIFICATION END
+            const totalMonthlyExpense = monthlyStaffSalaries + proratedMonthlyOfficeExpenses + directMonthlyExpenses;
+            const monthlyBalance = monthlyIncome - totalMonthlyExpense;
+
+            if (App.DOMElements['monthly-expense-total']) App.DOMElements['monthly-expense-total'].textContent = App.formatCurrency(totalMonthlyExpense);
+            if (App.DOMElements['monthly-income-total']) App.DOMElements['monthly-income-total'].textContent = App.formatCurrency(monthlyIncome);
+            if (App.DOMElements['monthly-balance-total']) App.DOMElements['monthly-balance-total'].textContent = App.formatCurrency(monthlyBalance);
+            // MODIFICATION END
+        } catch (error) {
+            console.error('Dashboard summary load error:', error);
+            // Keep existing default values on failure.
+        } finally {
+            setDashboardLoadingState(false);
+        }
     }
 
     async function showPendingInvoicesModal() {
@@ -1313,6 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'design-studio-btn',
             'vendor-master-search', 'vendor-search-results-body', 'project-vendor-list-body',
             'new-project-btn', 'search-box', 'new-sample-project-btn', 'project-list-body', 'load-from-file-btn', 'save-to-file-btn', 'xml-file-input', 'load-site-update-btn', 'site-update-file-input', 'toggle-invoices-btn', 'show-archived-toggle',
+            'dashboard-loader', 'dashboard-loader-text',
             'pending-invoices-summary', 'pending-invoices-count', 'pending-invoices-amount', 'last-paid-amount', 'on-hold-amount', 'expiring-documents-summary', 'expiring-documents-count',
             'back-to-dashboard-btn', 'save-project-btn', 'create-revision-btn', 'project-view-title', 'page-size-selector', 'generate-pdf-btn',
             'main-tab', 'scope-tab', 'fees-tab', 'invoicing-tab', 'swimming-pool-tab', // MODIFICATION: Add new tab ID
