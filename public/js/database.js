@@ -56,6 +56,28 @@
 
     let activeDbProvider = 'indexeddb';
 
+    const CACHE_STORAGE_PREFIX = 'UrbanAxisDataCache:v1';
+    const inMemoryStoreCache = new Map();
+    const PERSISTED_CACHE_STORES = new Set([
+        STORES.PROJECTS,
+        STORES.SITE_DATA,
+        STORES.HR_DATA,
+        STORES.SETTINGS,
+        STORES.OFFICE_EXPENSES,
+        STORES.FINANCIAL_TEMPLATES,
+        STORES.HOLIDAYS,
+        STORES.STAFF_LEAVES,
+        STORES.DESIGN_SCRUM,
+        STORES.BULLETIN,
+        STORES.VENDORS,
+        STORES.REFERRAL_ACCOUNTS,
+        STORES.OTHER_ACCOUNTS,
+        STORES.ASSETS,
+        STORES.LETTER_DRAFTS,
+        STORES.SENT_LETTERS,
+        STORES.RECIPIENT_HISTORY
+    ]);
+
     const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
     const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
     const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
@@ -181,6 +203,168 @@
 
     function hasMeaningfulValue(value) {
         return !(value === null || typeof value === 'undefined' || value === '');
+    }
+
+    function deepClone(value) {
+        if (value === null || typeof value === 'undefined') return value;
+        return JSON.parse(JSON.stringify(value));
+    }
+
+    function getStoreCacheBucketKey(storeName) {
+        return `${activeDbProvider}:${storeName}`;
+    }
+
+    function canPersistStoreCache(storeName) {
+        return PERSISTED_CACHE_STORES.has(storeName) && typeof window !== 'undefined' && window.localStorage;
+    }
+
+    function getPersistentStoreCacheKey(storeName) {
+        return `${CACHE_STORAGE_PREFIX}:${activeDbProvider}:${storeName}`;
+    }
+
+    function hasAnyStoreCache(storeName) {
+        if (inMemoryStoreCache.has(getStoreCacheBucketKey(storeName))) return true;
+        if (!canPersistStoreCache(storeName)) return false;
+        try {
+            return Boolean(window.localStorage.getItem(getPersistentStoreCacheKey(storeName)));
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    function readPersistedStoreCache(storeName) {
+        if (!canPersistStoreCache(storeName)) return null;
+        try {
+            const raw = window.localStorage.getItem(getPersistentStoreCacheKey(storeName));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed?.records) ? parsed.records : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function writePersistedStoreCache(storeName, records) {
+        if (!canPersistStoreCache(storeName)) return;
+        try {
+            window.localStorage.setItem(
+                getPersistentStoreCacheKey(storeName),
+                JSON.stringify({ records, savedAt: Date.now() })
+            );
+        } catch (error) {
+            console.warn(`[DB] Could not persist cache for store "${storeName}".`, error?.message || error);
+        }
+    }
+
+    function clearPersistedStoreCache(storeName) {
+        if (!canPersistStoreCache(storeName)) return;
+        try {
+            window.localStorage.removeItem(getPersistentStoreCacheKey(storeName));
+        } catch (_error) {
+            // No-op for browsers where localStorage is restricted.
+        }
+    }
+
+    function setStoreCacheRecords(storeName, records) {
+        const normalized = Array.isArray(records) ? records : [];
+        const cloned = deepClone(normalized);
+        inMemoryStoreCache.set(getStoreCacheBucketKey(storeName), cloned);
+        writePersistedStoreCache(storeName, cloned);
+    }
+
+    function getCachedStoreRecords(storeName) {
+        const memoryKey = getStoreCacheBucketKey(storeName);
+        if (inMemoryStoreCache.has(memoryKey)) {
+            return deepClone(inMemoryStoreCache.get(memoryKey));
+        }
+
+        const persisted = readPersistedStoreCache(storeName);
+        if (persisted) {
+            inMemoryStoreCache.set(memoryKey, deepClone(persisted));
+            return deepClone(persisted);
+        }
+        return null;
+    }
+
+    function clearStoreCache(storeName) {
+        inMemoryStoreCache.delete(getStoreCacheBucketKey(storeName));
+        clearPersistedStoreCache(storeName);
+    }
+
+    function clearAllStoreCaches() {
+        inMemoryStoreCache.clear();
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < window.localStorage.length; i++) {
+                const key = window.localStorage.key(i);
+                if (key && key.startsWith(`${CACHE_STORAGE_PREFIX}:`)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => window.localStorage.removeItem(key));
+        } catch (_error) {
+            // No-op for browsers where localStorage is restricted.
+        }
+    }
+
+    function findCachedRecordByKey(storeName, key) {
+        const records = getCachedStoreRecords(storeName);
+        if (!records) return undefined;
+        const meta = getStoreMeta(storeName);
+        const normalizedKey = normalizeKeyType(storeName, key);
+        const match = records.find(item => normalizeKeyType(storeName, item?.[meta.keyPath]) === normalizedKey);
+        return typeof match === 'undefined' ? undefined : deepClone(match);
+    }
+
+    function patchCachedStoreRecord(storeName, data, explicitKey) {
+        if (!hasAnyStoreCache(storeName)) return;
+        const records = getCachedStoreRecords(storeName);
+        if (!records) return;
+
+        const meta = getStoreMeta(storeName);
+        const targetKey = normalizeKeyType(storeName, hasMeaningfulValue(explicitKey) ? explicitKey : data?.[meta.keyPath]);
+        if (!hasMeaningfulValue(targetKey)) return;
+
+        const nextRecord = { ...(data || {}) };
+        if (!hasMeaningfulValue(nextRecord[meta.keyPath])) {
+            nextRecord[meta.keyPath] = targetKey;
+        }
+
+        const index = records.findIndex(item => normalizeKeyType(storeName, item?.[meta.keyPath]) === targetKey);
+        if (index >= 0) {
+            records[index] = nextRecord;
+        } else {
+            records.push(nextRecord);
+        }
+        setStoreCacheRecords(storeName, records);
+    }
+
+    function removeCachedStoreRecord(storeName, key) {
+        if (!hasAnyStoreCache(storeName)) return;
+        const records = getCachedStoreRecords(storeName);
+        if (!records) return;
+        const meta = getStoreMeta(storeName);
+        const normalizedKey = normalizeKeyType(storeName, key);
+        const filtered = records.filter(item => normalizeKeyType(storeName, item?.[meta.keyPath]) !== normalizedKey);
+        setStoreCacheRecords(storeName, filtered);
+    }
+
+    function applyFilteredCacheClear(storeName, filter) {
+        if (!hasAnyStoreCache(storeName)) return;
+        const records = getCachedStoreRecords(storeName);
+        if (!records) return;
+
+        const filterEntries = Object.entries(filter || {}).filter(([, value]) => value !== null && typeof value !== 'undefined');
+        if (filterEntries.length === 0) {
+            clearStoreCache(storeName);
+            return;
+        }
+
+        const filtered = records.filter(record => {
+            return !filterEntries.every(([k, v]) => String(record?.[k]) === String(v));
+        });
+        setStoreCacheRecords(storeName, filtered);
     }
 
     function isDuplicateKeyRemoteError(error) {
@@ -880,26 +1064,65 @@
         init,
         STORES, // Expose store names for external use if needed
         getActiveProvider: () => activeDbProvider,
+        refreshCache: async () => {
+            clearAllStoreCaches();
+            return true;
+        },
 
         // --- Generic CRUD Methods ---
         get: async (storeName, key) => {
-            if (isRemoteProvider()) {
-                return remoteGet(storeName, key);
+            const cachedRecord = findCachedRecordByKey(storeName, key);
+            if (typeof cachedRecord !== 'undefined') {
+                return cachedRecord;
             }
-            return makeRequest(storeName, 'readonly', store => store.get(key));
+
+            // Prime cache with a single store fetch for key-based lookups on lightweight stores.
+            // This avoids N network calls for patterns like repeated getScrumData(jobNo).
+            if (storeName !== STORES.FILES && !hasAnyStoreCache(storeName)) {
+                const records = await publicAPI.getAll(storeName);
+                const meta = getStoreMeta(storeName);
+                const normalizedKey = normalizeKeyType(storeName, key);
+                const fromList = records.find(item => normalizeKeyType(storeName, item?.[meta.keyPath]) === normalizedKey);
+                if (typeof fromList !== 'undefined') {
+                    return deepClone(fromList);
+                }
+            }
+
+            if (isRemoteProvider()) {
+                const result = await remoteGet(storeName, key);
+                if (result) patchCachedStoreRecord(storeName, result, key);
+                return result;
+            }
+
+            const result = await makeRequest(storeName, 'readonly', store => store.get(key));
+            if (result) patchCachedStoreRecord(storeName, result, key);
+            return result;
         },
         getAll: async (storeName) => {
-            if (isRemoteProvider()) {
-                return remoteGetAll(storeName);
+            const cachedRecords = getCachedStoreRecords(storeName);
+            if (cachedRecords) {
+                return cachedRecords;
             }
-            return makeRequest(storeName, 'readonly', store => store.getAll());
+
+            if (isRemoteProvider()) {
+                const records = await remoteGetAll(storeName);
+                setStoreCacheRecords(storeName, records || []);
+                return deepClone(records || []);
+            }
+
+            const records = await makeRequest(storeName, 'readonly', store => store.getAll());
+            setStoreCacheRecords(storeName, records || []);
+            return deepClone(records || []);
         },
         put: async (storeName, data) => {
             const payload = { ...data, lastSync: new Date().toISOString() };
             if (isRemoteProvider()) {
-                return remotePut(storeName, payload);
+                const resultKey = await remotePut(storeName, payload);
+                patchCachedStoreRecord(storeName, payload, resultKey);
+                return resultKey;
             }
-            return makeRequest(storeName, 'readwrite', store => {
+
+            const resultKey = await makeRequest(storeName, 'readwrite', store => {
                 // Robustness: If the keyPath property is null/undefined, remove it to allow auto-increment
                 const kp = store.keyPath;
                 if (kp && (payload[kp] === null || payload[kp] === undefined)) {
@@ -907,31 +1130,48 @@
                 }
                 return store.put(payload);
             });
+            patchCachedStoreRecord(storeName, payload, resultKey);
+            return resultKey;
         },
         add: async (storeName, data) => {
             const payload = { ...data };
             if (isRemoteProvider()) {
-                return remoteAdd(storeName, payload);
+                const resultKey = await remoteAdd(storeName, payload);
+                patchCachedStoreRecord(storeName, payload, resultKey);
+                return resultKey;
             }
-            return makeRequest(storeName, 'readwrite', store => {
+
+            const resultKey = await makeRequest(storeName, 'readwrite', store => {
                 const kp = store.keyPath;
                 if (kp && (payload[kp] === null || payload[kp] === undefined)) {
                     delete payload[kp];
                 }
                 return store.add(payload);
             });
+            patchCachedStoreRecord(storeName, payload, resultKey);
+            return resultKey;
         },
         delete: async (storeName, key) => {
             if (isRemoteProvider()) {
-                return remoteDelete(storeName, key);
+                const result = await remoteDelete(storeName, key);
+                removeCachedStoreRecord(storeName, key);
+                return result;
             }
-            return makeRequest(storeName, 'readwrite', store => store.delete(key));
+
+            const result = await makeRequest(storeName, 'readwrite', store => store.delete(key));
+            removeCachedStoreRecord(storeName, key);
+            return result;
         },
         clear: async (storeName, filter) => {
             if (isRemoteProvider()) {
-                return remoteClear(storeName, filter || {});
+                const result = await remoteClear(storeName, filter || {});
+                applyFilteredCacheClear(storeName, filter || {});
+                return result;
             }
-            return makeRequest(storeName, 'readwrite', store => store.clear());
+
+            const result = await makeRequest(storeName, 'readwrite', store => store.clear());
+            clearStoreCache(storeName);
+            return result;
         },
 
         // --- Project Methods ---

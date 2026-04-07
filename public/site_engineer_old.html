@@ -798,6 +798,15 @@ overflow-x: scroll;border: 1px solid #ccc; height: 100%; box-sizing: border-box;
 <script src="js/gantt_chart.js"></script>
 <script src="js/overlay_gantt_chart.js"></script>
 <script src="js/bim_viewer.js"></script>
+<!-- CommonJS shim for browser environment (fixes "exports is not defined" errors) -->
+<script>
+  if (typeof exports === 'undefined') {
+    var exports = {};
+  }
+  if (typeof module === 'undefined') {
+    var module = { exports: exports };
+  }
+</script>
 <script type="module" src="js/site_app.js"></script>
 <!-- <script src="js/site_app.js"></script> -->
 

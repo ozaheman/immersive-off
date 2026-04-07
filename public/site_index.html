@@ -31,6 +31,29 @@
             flex: 1;
         }
 
+        .site-list-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .site-list-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .site-inline-loader {
+            font-size: 0.85em;
+            color: #666;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #f2f4f7;
+            border: 1px solid #e1e4e8;
+        }
+
         .site-project-details {
             flex: 3;
             background: #f9f9f9;
@@ -922,7 +945,13 @@
 
         <div class="site-main-layout">
             <div class="site-project-list">
-                <h2>Projects</h2>
+                <div class="site-list-heading">
+                    <h2>Projects</h2>
+                    <div class="site-list-actions">
+                        <button id="refresh-site-data-btn" class="secondary-button" title="Reload latest list data">Refresh Data</button>
+                        <span id="site-project-list-loader" class="site-inline-loader" style="display:none;">Loading project list...</span>
+                    </div>
+                </div>
                 <table id="project-list-table">
                     <thead>
                         <tr>

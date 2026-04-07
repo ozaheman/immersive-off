@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 export function cacheDomElements() {
     const ids = [
-        'main-site-container', 'login-modal', 'logout-btn', 'perform-login-btn', 'login-role', 'login-username', 'login-password', 'login-error', 'welcome-user-msg', 'project-list-body', 'details-project-name', 'details-project-info', 'back-to-global-btn', 'control-tabs-container', 'site-status-select', 'floor-selector-container', 'rfi-log-list', 'mom-list', 'material-approval-list', 'bulletin-feed', 'subcontractor-list', 'vendor-search-results', 'calendar-grid-body', 'month-year-display',
+        'main-site-container', 'login-modal', 'logout-btn', 'perform-login-btn', 'login-role', 'login-username', 'login-password', 'login-error', 'welcome-user-msg', 'project-list-body', 'refresh-site-data-btn', 'site-project-list-loader', 'details-project-name', 'details-project-info', 'back-to-global-btn', 'control-tabs-container', 'site-status-select', 'floor-selector-container', 'rfi-log-list', 'mom-list', 'material-approval-list', 'bulletin-feed', 'subcontractor-list', 'vendor-search-results', 'calendar-grid-body', 'month-year-display',
         'holiday-country-select', 'load-holidays-btn', 'resource-calculator-body', 'resource-day-rate',
         'photo-gallery',
         'site-doc-gallery', 'project-docs-gallery',
@@ -810,6 +810,7 @@ function setupCoreEventListeners() {
     DOMElements.performLoginBtn?.addEventListener('click', handleLogin);
     DOMElements.logoutBtn?.addEventListener('click', handleLogout);
     DOMElements.projectListBody.addEventListener('click', handleProjectSelect);
+    DOMElements.refreshSiteDataBtn?.addEventListener('click', handleManualSiteDataRefresh);
     DOMElements.backToGlobalBtn.addEventListener('click', showGlobalView);
     DOMElements.controlTabsContainer.addEventListener('click', handleTabClick);
 
@@ -1116,43 +1117,105 @@ async function autoLoadProject(jobNo) {
     const targetRow = Array.from(DOMElements.projectListBody.querySelectorAll('tr')).find(r => r.dataset.jobNo === jobNo);
     if (targetRow) await handleProjectSelect({ target: targetRow });
 }
+
+function setProjectListLoadingState(isLoading, message = 'Loading project list...') {
+    const loader = DOMElements.siteProjectListLoader;
+    if (!loader) return;
+    if (isLoading) {
+        loader.textContent = message;
+        loader.style.display = 'inline-flex';
+        return;
+    }
+    loader.style.display = 'none';
+}
+
+async function handleManualSiteDataRefresh() {
+    const refreshButton = DOMElements.refreshSiteDataBtn;
+    const originalButtonText = refreshButton?.textContent || 'Refresh Data';
+    const previousJobNo = AppState.currentJobNo;
+
+    if (refreshButton) {
+        refreshButton.disabled = true;
+        refreshButton.textContent = 'Refreshing...';
+    }
+
+    try {
+        setProjectListLoadingState(true, 'Refreshing cached list data...');
+        if (window.DB?.refreshCache) {
+            await window.DB.refreshCache();
+        }
+
+        await renderProjectList();
+
+        if (previousJobNo) {
+            const selectedRow = Array.from(DOMElements.projectListBody.querySelectorAll('tr')).find(r => r.dataset.jobNo === previousJobNo);
+            if (selectedRow) {
+                await handleProjectSelect({ target: selectedRow });
+            } else {
+                showGlobalView();
+            }
+        } else {
+            await updateDashboardStats();
+        }
+    } catch (error) {
+        console.error('Manual site data refresh failed:', error);
+        alert('Could not refresh site data. Please try again.');
+    } finally {
+        setProjectListLoadingState(false);
+        if (refreshButton) {
+            refreshButton.disabled = false;
+            refreshButton.textContent = originalButtonText;
+        }
+    }
+}
+
 async function renderProjectList() {
-    const allProjects = await window.DB.getAllProjects();
-    const allSiteData = await window.DB.getAllSiteData();
-    const siteDataMap = new Map(allSiteData.map(d => [d.jobNo, d]));
+    setProjectListLoadingState(true, 'Loading project list...');
+    DOMElements.projectListBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 12px; color: #666;">Loading projects...</td></tr>';
 
-    const filteredProjects = AppState.accessibleProjects.length > 0
-        ? allProjects.filter(p => AppState.accessibleProjects.includes(p.jobNo))
-        : allProjects;
+    try {
+        const allProjects = await window.DB.getAllProjects();
+        const allSiteData = await window.DB.getAllSiteData();
+        const siteDataMap = new Map(allSiteData.map(d => [d.jobNo, d]));
 
-    // Filter archived projects based on toggle state
-    const showArchived = document.getElementById('show-archived-toggle')?.checked || false;
-    const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
+        const filteredProjects = AppState.accessibleProjects.length > 0
+            ? allProjects.filter(p => AppState.accessibleProjects.includes(p.jobNo))
+            : allProjects;
 
-    DOMElements.projectListBody.innerHTML = displayedProjects.map(p => {
-        let siteData = siteDataMap.get(p.jobNo) || { status: 'Pending Start', progress: 0 };
-        const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
-        return `<tr data-job-no="${p.jobNo}" class="${p.archived ? 'archived-row' : ''}">
-            <td>${p.jobNo}</td>
-            <td>${p.projectDescription}<br><small>${p.clientName}</small></td>
-            <td>${p.plotNo}</td>
-            <td>${siteData.status} (${siteData.progress || 0}%)</td>
-            <td>-</td>
-            <td>-</td>
-            <td>
-                <button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}">
-                    ${p.archived ? '↻ Unarchive' : '📦 Archive'}
-                </button>
-                <button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete">
-                    🗑️ Delete
-                </button>
-                ${archivedBadge}
-            </td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="7">No projects accessible.</td></tr>';
+        // Filter archived projects based on toggle state
+        const showArchived = document.getElementById('show-archived-toggle')?.checked || false;
+        const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
 
-    // Attach event listeners to action buttons
-    attachProjectActionListeners();
+        DOMElements.projectListBody.innerHTML = displayedProjects.map(p => {
+            let siteData = siteDataMap.get(p.jobNo) || { status: 'Pending Start', progress: 0 };
+            const archivedBadge = p.archived ? '<span class="archived-badge">ARCHIVED</span>' : '';
+            return `<tr data-job-no="${p.jobNo}" class="${p.archived ? 'archived-row' : ''}">
+                <td>${p.jobNo}</td>
+                <td>${p.projectDescription}<br><small>${p.clientName}</small></td>
+                <td>${p.plotNo}</td>
+                <td>${siteData.status} (${siteData.progress || 0}%)</td>
+                <td>-</td>
+                <td>-</td>
+                <td>
+                    <button class="action-btn archive-btn" data-job-no="${p.jobNo}" title="${p.archived ? 'Unarchive' : 'Archive'}">
+                        ${p.archived ? '↻ Unarchive' : '📦 Archive'}
+                    </button>
+                    <button class="action-btn delete-btn" data-job-no="${p.jobNo}" title="Delete">
+                        🗑️ Delete
+                    </button>
+                    ${archivedBadge}
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" style="text-align:center; padding: 12px; color: #666;">No projects accessible.</td></tr>';
+
+        // Attach event listeners to action buttons
+        attachProjectActionListeners();
+    } catch (error) {
+        console.error('Failed to render site project list:', error);
+        DOMElements.projectListBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 12px; color: #666;">Unable to load projects right now.</td></tr>';
+    } finally {
+        setProjectListLoadingState(false);
+    }
 }
 
 // Attach listeners to archive/delete action buttons
@@ -1550,18 +1613,19 @@ async function renderFileGalleryzzz(galleryEl, source, type, isDeletable, search
 }
 async function renderFileGallery(galleryEl, source, categoryOrTypeFilter, isDeletable, searchTerm = '') {
     if (!galleryEl) return;
-    galleryEl.innerHTML = '';
+    galleryEl.innerHTML = '<p style="color:#666; text-align:center; padding: 10px;">Loading files...</p>';
 
-    // --- FIX 2: Correctly filter by project for all views inside a project ---
-    // The previous logic incorrectly set jobNoFilter to null for master docs,
-    // making them appear global instead of project-specific.
-    const jobNoFilter = AppState.currentJobNo;
-    if (!jobNoFilter) {
-        galleryEl.innerHTML = '<p>Select a project to view files.</p>';
-        return;
-    }
+    try {
+        // --- FIX 2: Correctly filter by project for all views inside a project ---
+        // The previous logic incorrectly set jobNoFilter to null for master docs,
+        // making them appear global instead of project-specific.
+        const jobNoFilter = AppState.currentJobNo;
+        if (!jobNoFilter) {
+            galleryEl.innerHTML = '<p>Select a project to view files.</p>';
+            return;
+        }
 
-    let files = await window.DB.getFiles(jobNoFilter, source);
+        let files = await window.DB.getFiles(jobNoFilter, source);
 
     /* // Filter by category if specified
     if (categoryFilters) {
@@ -1587,20 +1651,20 @@ async function renderFileGallery(galleryEl, source, categoryOrTypeFilter, isDele
 
     }
 
-    if (searchTerm) {
-        const lowerSearchTerm = searchTerm.toLowerCase();
-        files = files.filter(f => f.name.toLowerCase().includes(lowerSearchTerm));
-    }
-    files.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    if (files.length === 0) {
-        galleryEl.innerHTML = '<p>No files in this category.</p>';
-        return;
-    }
-    files.forEach(file => {
-        const div = document.createElement('div');
-        div.className = 'thumbnail-container';
-        if (!isDeletable) div.classList.add('read-only');
-        div.dataset.fileId = file.id; // FIX [11]: Add file ID for previewing
+        if (searchTerm) {
+            const lowerSearchTerm = searchTerm.toLowerCase();
+            files = files.filter(f => f.name.toLowerCase().includes(lowerSearchTerm));
+        }
+        files.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        if (files.length === 0) {
+            galleryEl.innerHTML = '<p>No files in this category.</p>';
+            return;
+        }
+        files.forEach(file => {
+            const div = document.createElement('div');
+            div.className = 'thumbnail-container';
+            if (!isDeletable) div.classList.add('read-only');
+            div.dataset.fileId = file.id; // FIX [11]: Add file ID for previewing
 
         const isImage = file.fileType?.startsWith('image/');
         let expiryHtml = '';
@@ -1629,16 +1693,20 @@ async function renderFileGallery(galleryEl, source, categoryOrTypeFilter, isDele
                          expiryHtml;
          }else{ */
 
-        /* const captionDate = file.statusDate || new Date(file.timestamp).toISOString().split('T')[0]; */
-        const captionDate = file.statusDate || (file.timestamp ? new Date(file.timestamp).toISOString().split('T')[0] : 'N/A');
-        const caption = `${file.name}<br><small>${captionDate}</small>`;
-        div.innerHTML = (isImage ? `<img src="${file.dataUrl}" class="thumbnail">` : `<div class="file-icon">📄</div>`) +
-            `<div class="thumbnail-caption">${caption}</div>` +
-            (isDeletable ? `<div class="thumbnail-delete-btn" data-id="${file.id}">×</div>` : '') +
-            expiryHtml;
-        // }
-        galleryEl.appendChild(div);
-    });
+            /* const captionDate = file.statusDate || new Date(file.timestamp).toISOString().split('T')[0]; */
+            const captionDate = file.statusDate || (file.timestamp ? new Date(file.timestamp).toISOString().split('T')[0] : 'N/A');
+            const caption = `${file.name}<br><small>${captionDate}</small>`;
+            div.innerHTML = (isImage ? `<img src="${file.dataUrl}" class="thumbnail">` : `<div class="file-icon">📄</div>`) +
+                `<div class="thumbnail-caption">${caption}</div>` +
+                (isDeletable ? `<div class="thumbnail-delete-btn" data-id="${file.id}">×</div>` : '') +
+                expiryHtml;
+            // }
+            galleryEl.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Failed to render file gallery:', error);
+        galleryEl.innerHTML = '<p style="color:#666; text-align:center; padding: 10px;">Unable to load files right now.</p>';
+    }
 
 
 }
@@ -1830,7 +1898,7 @@ function changeMonth(offset) {
 async function renderCalendar() {
     DOMElements.monthYearDisplay.textContent = AppState.calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     const grid = DOMElements.calendarGridBody;
-    grid.innerHTML = '';
+    if (!grid) return;
     const allEvents = {};
 
     const addEvent = (date, type, text, color = null, momIndex = null, jobNo = null) => {
@@ -1841,84 +1909,77 @@ async function renderCalendar() {
         }
     };
 
-    const allHolidays = await window.DB.getAllHolidays();
-    allHolidays.forEach(holiday => addEvent(holiday.date, 'holiday', holiday.name));
-    const allStaffLeaves = await DB.getAll('staffLeaves');
-    allStaffLeaves.forEach(leave => {
-        let currentDate = new Date(leave.startDate + 'T00:00:00');
-        const endDate = new Date(leave.endDate + 'T00:00:00');
-        while (currentDate <= endDate) {
-            addEvent(currentDate, 'leave', `On Leave: ${leave.staffName}`);
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-    });
+    try {
+        const allHolidays = await window.DB.getAllHolidays();
+        allHolidays.forEach(holiday => addEvent(holiday.date, 'holiday', holiday.name));
+        const allStaffLeaves = await DB.getAll('staffLeaves');
+        allStaffLeaves.forEach(leave => {
+            let currentDate = new Date(leave.startDate + 'T00:00:00');
+            const endDate = new Date(leave.endDate + 'T00:00:00');
+            while (currentDate <= endDate) {
+                addEvent(currentDate, 'leave', `On Leave: ${leave.staffName}`);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        });
 
-    const projectsToScan = AppState.currentJobNo ? [AppState.currentJobNo] : (await DB.getAllProjects()).map(p => p.jobNo);
+        const projectsToScan = AppState.currentJobNo ? [AppState.currentJobNo] : (await DB.getAllProjects()).map(p => p.jobNo);
 
-    for (const jobNo of projectsToScan) {
-        const project = await window.DB.getProject(jobNo);
-        const siteData = await window.DB.getSiteData(jobNo);
-        if (!siteData) continue;
+        for (const jobNo of projectsToScan) {
+            const project = await window.DB.getProject(jobNo);
+            const siteData = await window.DB.getSiteData(jobNo);
+            if (!siteData) continue;
 
-        const color = AppState.currentJobNo ? null : getProjectColor(jobNo);
-        const prefix = AppState.currentJobNo ? '' : `${jobNo}: `;
+            const color = AppState.currentJobNo ? null : getProjectColor(jobNo);
+            const prefix = AppState.currentJobNo ? '' : `${jobNo}: `;
 
-        (siteData.statusLog || []).forEach(log => addEvent(log.date, 'status', `${prefix}Status: ${log.status}`, color));
-        (siteData.mom || []).forEach((mom, index) => addEvent(mom.date, 'mom', `${prefix}MoM: Ref ${mom.ref || 'N/A'}`, color, index, jobNo));
-        /*   (siteData.nocLog || []).forEach(noc => addEvent(noc.submissionDate, 'noc', `${prefix}NOC: ${noc.name}`, '#6f42c1'));
-        //if (project.projectType === 'Villa') {
-            const dynamicSchedule = await getProjectSchedule(project, siteData);
-            dynamicSchedule.forEach(task => {
+            (siteData.statusLog || []).forEach(log => addEvent(log.date, 'status', `${prefix}Status: ${log.status}`, color));
+            (siteData.mom || []).forEach((mom, index) => addEvent(mom.date, 'mom', `${prefix}MoM: Ref ${mom.ref || 'N/A'}`, color, index, jobNo));
+            (siteData.nocLog || []).forEach(noc => addEvent(noc.submissionDate, 'noc', `${prefix}NOC: ${noc.name}`, '#6f42c1'));
+
+            const schedule = await getProjectSchedule(project, siteData);
+            schedule.forEach(task => {
                 const start = new Date(task.start + 'T00:00:00');
                 const end = new Date(task.end + 'T00:00:00');
                 if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-                
+
                 for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                     addEvent(d, 'gantt-task', `${prefix}${task.name}`, color);
                 }
             });
-        //} */
-        (siteData.nocLog || []).forEach(noc => addEvent(noc.submissionDate, 'noc', `${prefix}NOC: ${noc.name}`, '#6f42c1'));
-
-        const schedule = await getProjectSchedule(project, siteData);
-        schedule.forEach(task => {
-            const start = new Date(task.start + 'T00:00:00');
-            const end = new Date(task.end + 'T00:00:00');
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                addEvent(d, 'gantt-task', `${prefix}${task.name}`, color);
-            }
-        });
-    }
-
-    const year = AppState.calendarDate.getFullYear(), month = AppState.calendarDate.getMonth();
-    const startDayOfWeek = new Date(year, month, 1).getDay();
-    const currentDay = new Date(year, month, 1 - startDayOfWeek);
-    for (let i = 0; i < 42; i++) {
-        const dayCell = document.createElement('div');
-        dayCell.className = 'calendar-day';
-        const dayKey = currentDay.toDateString();
-        if (currentDay.getMonth() !== month) dayCell.classList.add('other-month');
-        dayCell.innerHTML = `<div class="day-number">${currentDay.getDate()}</div><div class="day-events"></div>`;
-        const eventsContainer = dayCell.querySelector('.day-events');
-        if (allEvents[dayKey]) {
-            allEvents[dayKey].sort((a, b) => a.type === 'holiday' ? -1 : 1).forEach(event => {
-                const eventEl = document.createElement('span');
-                eventEl.className = `${event.type.includes('gantt') ? 'event-bar' : 'event-dot'} ${event.type}`;
-                eventEl.textContent = event.text;
-                eventEl.title = event.text;
-                if (event.color) eventEl.style.backgroundColor = event.color;
-                if (event.type === 'mom' && event.momIndex !== null) {
-                    eventEl.dataset.momIndex = event.momIndex;
-                    eventEl.dataset.jobNo = event.jobNo;
-                    eventEl.classList.add('clickable-event');
-                }
-                eventsContainer.appendChild(eventEl);
-            });
         }
-        grid.appendChild(dayCell);
-        currentDay.setDate(currentDay.getDate() + 1);
+
+        const year = AppState.calendarDate.getFullYear(), month = AppState.calendarDate.getMonth();
+        const startDayOfWeek = new Date(year, month, 1).getDay();
+        const currentDay = new Date(year, month, 1 - startDayOfWeek);
+        const nextCells = document.createDocumentFragment();
+        for (let i = 0; i < 42; i++) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'calendar-day';
+            const dayKey = currentDay.toDateString();
+            if (currentDay.getMonth() !== month) dayCell.classList.add('other-month');
+            dayCell.innerHTML = `<div class="day-number">${currentDay.getDate()}</div><div class="day-events"></div>`;
+            const eventsContainer = dayCell.querySelector('.day-events');
+            if (allEvents[dayKey]) {
+                allEvents[dayKey].sort((a, b) => a.type === 'holiday' ? -1 : 1).forEach(event => {
+                    const eventEl = document.createElement('span');
+                    eventEl.className = `${event.type.includes('gantt') ? 'event-bar' : 'event-dot'} ${event.type}`;
+                    eventEl.textContent = event.text;
+                    eventEl.title = event.text;
+                    if (event.color) eventEl.style.backgroundColor = event.color;
+                    if (event.type === 'mom' && event.momIndex !== null) {
+                        eventEl.dataset.momIndex = event.momIndex;
+                        eventEl.dataset.jobNo = event.jobNo;
+                        eventEl.classList.add('clickable-event');
+                    }
+                    eventsContainer.appendChild(eventEl);
+                });
+            }
+            nextCells.appendChild(dayCell);
+            currentDay.setDate(currentDay.getDate() + 1);
+        }
+        grid.replaceChildren(nextCells);
+    } catch (error) {
+        console.error('Site calendar load error:', error);
     }
 }
 

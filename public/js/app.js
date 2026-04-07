@@ -6,6 +6,7 @@ const App = {
     currentProjectJobNo: null,
     currentInvoiceIndex: null,
     showAllInvoices: false,
+    dashboardSnapshot: null,
     DOMElements: {},
     ProjectTabs: {}, // To hold all the project tab modules
     formatCurrency: (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED' }).format(Math.round(num || 0)),
@@ -36,6 +37,94 @@ const App = {
 
 document.addEventListener('DOMContentLoaded', () => {
     let lastScrumCheck = new Date(); // For periodic checks
+    const DASHBOARD_SNAPSHOT_KEY = 'ua_dashboard_snapshot_v1';
+
+    function clearDashboardSnapshot() {
+        App.dashboardSnapshot = null;
+        try {
+            sessionStorage.removeItem(DASHBOARD_SNAPSHOT_KEY);
+        } catch (_error) {
+            // Ignore storage restrictions.
+        }
+    }
+
+    function saveDashboardSnapshot(snapshot) {
+        if (!snapshot) return;
+        App.dashboardSnapshot = snapshot;
+        try {
+            sessionStorage.setItem(DASHBOARD_SNAPSHOT_KEY, JSON.stringify(snapshot));
+        } catch (_error) {
+            // Ignore storage restrictions/quota issues.
+        }
+    }
+
+    function loadDashboardSnapshot() {
+        if (App.dashboardSnapshot) return App.dashboardSnapshot;
+        try {
+            const raw = sessionStorage.getItem(DASHBOARD_SNAPSHOT_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const provider = DB.getActiveProvider?.();
+            if (provider && parsed?.provider && provider !== parsed.provider) {
+                return null;
+            }
+            if (!Array.isArray(parsed?.allProjects) || !Array.isArray(parsed?.allSiteData)) {
+                return null;
+            }
+            App.dashboardSnapshot = parsed;
+            return parsed;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function hasStoredDashboardSnapshot() {
+        try {
+            return Boolean(sessionStorage.getItem(DASHBOARD_SNAPSHOT_KEY));
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    function buildDashboardSnapshot(allProjects, allSiteData, allScrumData, allFiles) {
+        const scrumByJob = {};
+        (allScrumData || []).forEach(scrum => {
+            if (scrum?.jobNo) scrumByJob[scrum.jobNo] = scrum;
+        });
+
+        const masterFilesByJob = {};
+        const allFilesForSummary = [];
+        (allFiles || []).forEach(file => {
+            allFilesForSummary.push({
+                id: file.id,
+                jobNo: file.jobNo,
+                source: file.source,
+                subCategory: file.subCategory,
+                name: file.name,
+                expiryDate: file.expiryDate || null
+            });
+            if (file?.source !== 'master' || !file?.jobNo) return;
+            if (!masterFilesByJob[file.jobNo]) masterFilesByJob[file.jobNo] = [];
+            masterFilesByJob[file.jobNo].push({
+                id: file.id,
+                subCategory: file.subCategory,
+                name: file.name,
+                expiryDate: file.expiryDate || null,
+                jobNo: file.jobNo
+            });
+        });
+
+        return {
+            version: 1,
+            provider: DB.getActiveProvider?.() || 'indexeddb',
+            savedAt: Date.now(),
+            allProjects,
+            allSiteData,
+            scrumByJob,
+            masterFilesByJob,
+            allFilesForSummary
+        };
+    }
 
 
     // --- BULLETIN MODULE ---
@@ -49,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = App.DOMElements['bulletin-list'];
             if (!container) return;
             container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">Loading activity...</p>';
-            setDashboardLoadingState(true, 'Loading activity feed...');
             try {
                 const items = await DB.getBulletinItems(20);
                 if (items.length === 0) {
@@ -67,8 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Bulletin load error:', error);
                 container.innerHTML = '<p style="color: #888; text-align: center; padding-top: 20px;">No recent activity.</p>';
-            } finally {
-                setDashboardLoadingState(false);
             }
         }
         return { log, render };
@@ -84,10 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         async function render() {
             const gridBody = App.DOMElements['dash-cal-body'];
-            if (gridBody) {
-                gridBody.innerHTML = '<div class="dash-cal-loading">Loading calendar...</div>';
-            }
-            setDashboardLoadingState(true, 'Loading calendar...');
+            if (!gridBody) return;
             try {
                 const allStaff = await DB.getAllHRData();
                 const eventsByDate = {};
@@ -107,7 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
                 App.DOMElements['dash-cal-month-year'].textContent = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-                gridBody.innerHTML = '';
                 const year = calendarDate.getFullYear();
                 const month = calendarDate.getMonth();
                 const today = new Date();
@@ -116,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const startDayOfWeek = firstDayOfMonth.getDay();
                 const currentDay = new Date(firstDayOfMonth);
                 currentDay.setDate(currentDay.getDate() - startDayOfWeek);
+                const nextCells = document.createDocumentFragment();
                 for (let i = 0; i < 42; i++) {
                     const dayCell = document.createElement('div');
                     dayCell.className = 'dash-cal-day';
@@ -130,16 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         dayCell.classList.add('on-leave');
                         dayCell.title = `On Leave:\n${eventsByDate[dateKey].join('\n')}`;
                     }
-                    gridBody.appendChild(dayCell);
+                    nextCells.appendChild(dayCell);
                     currentDay.setDate(currentDay.getDate() + 1);
                 }
+                gridBody.replaceChildren(nextCells);
             } catch (error) {
                 console.error('Dashboard calendar load error:', error);
-                if (gridBody) {
-                    gridBody.innerHTML = '<div class="dash-cal-loading">Calendar data unavailable.</div>';
-                }
-            } finally {
-                setDashboardLoadingState(false);
             }
         }
         return { render, changeMonth };
@@ -169,17 +248,48 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">${message}</td></tr>`;
     }
 
+    async function handleManualDataRefresh() {
+        const refreshButton = App.DOMElements['refresh-dashboard-btn'];
+        const originalLabel = refreshButton?.textContent || 'Refresh Data';
+
+        if (refreshButton) {
+            refreshButton.disabled = true;
+            refreshButton.textContent = 'Refreshing...';
+        }
+
+        try {
+            setDashboardLoadingState(true, 'Refreshing cached data...');
+            await DB.refreshCache();
+            clearDashboardSnapshot();
+            await renderDashboard({ forceFresh: true });
+            await DashboardCalendar.render();
+            await Bulletin.render();
+        } catch (error) {
+            console.error('Manual refresh failed:', error);
+            alert('Could not refresh data. Please try again.');
+        } finally {
+            setDashboardLoadingState(false);
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.textContent = originalLabel;
+            }
+        }
+    }
+
     // --- INITIALIZATION ---
     async function main() {
         try {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
             cacheDOMElements();
-            setDashboardLoadingState(true, 'Initializing database...');
+            const hasSnapshotOnDisk = hasStoredDashboardSnapshot();
+            if (!hasSnapshotOnDisk) {
+                setDashboardLoadingState(true, 'Initializing database...');
+            }
             await DB.init();
             Object.values(App.ProjectTabs).forEach(module => module.init?.());
             initResizer();
             setupEventListeners();
-            await renderDashboard();
+            await renderDashboard({ preferSnapshot: true });
             await DashboardCalendar.render();
             await Bulletin.render();
             setInterval(checkForUpdates, 5 * 60 * 1000);
@@ -234,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         App.currentInvoiceIndex = null;
         App.ProjectTabs.PaymentCert.resetPreviewState?.(); // Reset payment cert preview state
         showView('dashboard-view');
-        renderDashboard();
+        renderDashboard({ preferSnapshot: true });
     }
     function showProjectView() {
         showView('project-view');
@@ -273,18 +383,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- DASHBOARD FUNCTIONS ---
-    async function renderDashboard() {
-        setDashboardLoadingState(true, 'Loading project list...');
-        showProjectListLoadingRow();
+    async function renderDashboard(options = {}) {
+        const preferSnapshot = Boolean(options.preferSnapshot);
+        const forceFresh = Boolean(options.forceFresh);
+        let snapshot = (!forceFresh && preferSnapshot) ? loadDashboardSnapshot() : null;
+        const shouldFetchFresh = !snapshot;
+
+        if (shouldFetchFresh) {
+            setDashboardLoadingState(true, 'Loading project list...');
+            showProjectListLoadingRow();
+        }
 
         const tbody = App.DOMElements['project-list-body'];
         try {
-            const allProjects = await DB.getAllProjects();
-            const allSiteData = await DB.getAllSiteData();
+            if (!snapshot) {
+                const [allProjects, allSiteData, allScrumData, allFiles] = await Promise.all([
+                    DB.getAllProjects(),
+                    DB.getAllSiteData(),
+                    DB.getAllScrumData(),
+                    DB.getAllFiles(true)
+                ]);
+                snapshot = buildDashboardSnapshot(allProjects, allSiteData, allScrumData, allFiles);
+                saveDashboardSnapshot(snapshot);
+            }
+
+            const allProjects = snapshot.allProjects || [];
+            const allSiteData = snapshot.allSiteData || [];
             const siteDataMap = new Map(allSiteData.map(data => [data.jobNo, data]));
+            const scrumDataMap = new Map(Object.entries(snapshot.scrumByJob || {}));
+            const filesMap = new Map(Object.entries(snapshot.masterFilesByJob || {}));
+            const allMasterFiles = Array.isArray(snapshot.allFilesForSummary)
+                ? snapshot.allFilesForSummary
+                : Object.values(snapshot.masterFilesByJob || {}).flat();
 
             // Defer non-critical summary calculations to happen after rendering
-            updateDashboardSummary(allProjects).catch(err => console.error('Dashboard summary update error:', err));
+            updateDashboardSummary(allProjects, {
+                allMasterFiles,
+                suppressLoader: !shouldFetchFresh
+            }).catch(err => console.error('Dashboard summary update error:', err));
 
             tbody.innerHTML = '';
             if (allProjects.length === 0) {
@@ -305,22 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const showArchived = App.DOMElements['show-archived-toggle']?.checked || false;
             const displayedProjects = filteredProjects.filter(p => showArchived || !p.archived);
 
-            // Pre-fetch all scrum data in parallel
-            const scrumDataMap = new Map();
             const sortedProjects = displayedProjects.sort((a, b) => b.jobNo.localeCompare(a.jobNo));
-            const scrumPromises = sortedProjects.map(async p => {
-                const scrumData = await DB.getScrumData(p.jobNo);
-                scrumDataMap.set(p.jobNo, scrumData);
-            });
-            await Promise.all(scrumPromises);
-
-            // Pre-fetch all master files in parallel (without hydration)
-            const filesMap = new Map();
-            const filePromises = sortedProjects.map(async p => {
-                const masterFiles = await DB.getFiles(p.jobNo, 'master', true);
-                filesMap.set(p.jobNo, masterFiles);
-            });
-            await Promise.all(filePromises);
 
             for (const p of sortedProjects) {
                 const row = tbody.insertRow();
@@ -367,13 +488,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Unable to load project list right now. Default values are retained.</td></tr>';
             }
         } finally {
-            setDashboardLoadingState(false);
+            if (shouldFetchFresh) {
+                setDashboardLoadingState(false);
+            }
         }
     }
 
 
-    async function updateDashboardSummary(projects) {
-        setDashboardLoadingState(true, 'Loading dashboard summary...');
+    async function updateDashboardSummary(projects, options = {}) {
+        const suppressLoader = Boolean(options.suppressLoader);
+        if (!suppressLoader) {
+            setDashboardLoadingState(true, 'Loading dashboard summary...');
+        }
         try {
             let totalPendingAmount = 0, pendingInvoiceCount = 0, totalOnHoldAmount = 0, lastPaidInvoice = null; // NEW: Built-Up Area Calc
             let totalBUA = 0;
@@ -417,7 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
             App.DOMElements['last-paid-amount'].textContent = lastPaidInvoice ? ` ${App.formatCurrency(lastPaidInvoice.paymentDetails.amountPaid)}` : 'N/A';
             App.DOMElements['on-hold-amount'].textContent = ` ${App.formatCurrency(totalOnHoldAmount)}`;
 
-            const allMasterFiles = await DB.getAllFiles(true);
+            const allMasterFiles = Array.isArray(options.allMasterFiles) ? options.allMasterFiles : await DB.getAllFiles(true);
             const now = new Date();
             const thirtyDaysFromNow = new Date();
             thirtyDaysFromNow.setDate(now.getDate() + 30);
@@ -460,7 +586,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Dashboard summary load error:', error);
             // Keep existing default values on failure.
         } finally {
-            setDashboardLoadingState(false);
+            if (!suppressLoader) {
+                setDashboardLoadingState(false);
+            }
         }
     }
 
@@ -1165,13 +1293,14 @@ document.addEventListener('DOMContentLoaded', () => {
         App.DOMElements.controlTabs?.addEventListener('click', handleTabSwitch);
         App.DOMElements.previewTabs?.addEventListener('click', handleTabSwitch);
         App.DOMElements['generate-pdf-btn']?.addEventListener('click', handleGeneratePdf);
-        App.DOMElements['search-box']?.addEventListener('input', renderDashboard);
+        App.DOMElements['search-box']?.addEventListener('input', () => renderDashboard({ preferSnapshot: true }));
+        App.DOMElements['refresh-dashboard-btn']?.addEventListener('click', handleManualDataRefresh);
         App.DOMElements['toggle-invoices-btn']?.addEventListener('click', () => {
             App.showAllInvoices = !App.showAllInvoices;
             App.DOMElements['toggle-invoices-btn'].textContent = App.showAllInvoices ? 'Show Pending Invoices' : 'Show All Invoices';
-            renderDashboard();
+            renderDashboard({ preferSnapshot: true });
         });
-        App.DOMElements['show-archived-toggle']?.addEventListener('change', renderDashboard);
+        App.DOMElements['show-archived-toggle']?.addEventListener('change', () => renderDashboard({ preferSnapshot: true }));
 
         App.DOMElements['project-list-body']?.addEventListener('click', async (e) => {
             const row = e.target.closest('tr');
@@ -1382,7 +1511,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'app-container', 'dashboard-view', 'project-view', 'resizer',
             'design-studio-btn',
             'vendor-master-search', 'vendor-search-results-body', 'project-vendor-list-body',
-            'new-project-btn', 'search-box', 'new-sample-project-btn', 'project-list-body', 'load-from-file-btn', 'save-to-file-btn', 'xml-file-input', 'load-site-update-btn', 'site-update-file-input', 'toggle-invoices-btn', 'show-archived-toggle',
+            'new-project-btn', 'search-box', 'refresh-dashboard-btn', 'new-sample-project-btn', 'project-list-body', 'load-from-file-btn', 'save-to-file-btn', 'xml-file-input', 'load-site-update-btn', 'site-update-file-input', 'toggle-invoices-btn', 'show-archived-toggle',
             'dashboard-loader', 'dashboard-loader-text',
             'pending-invoices-summary', 'pending-invoices-count', 'pending-invoices-amount', 'last-paid-amount', 'on-hold-amount', 'expiring-documents-summary', 'expiring-documents-count',
             'back-to-dashboard-btn', 'save-project-btn', 'create-revision-btn', 'project-view-title', 'page-size-selector', 'generate-pdf-btn',
